@@ -898,7 +898,7 @@ function buildAdversarialCollectionGuidance(options = {}) {
     return "Use the repository context below as primary evidence.";
   }
 
-  return "The repository context below is a lightweight summary. The full diff was too large to inline — use the `read` tool on the files listed under Changed Files to inspect them directly before finalizing findings. You do not have shell/bash access in this session.";
+  return "The repository context below is a lightweight summary. The full diff was too large to inline — use the `read`, `grep`, and `glob` tools to inspect the files listed under Changed Files directly before finalizing findings. You do not have shell/bash access in this session.";
 }
 
 export function collectReviewContext(cwd, target, options = {}) {
@@ -1835,6 +1835,7 @@ export async function runOpencodeTurn(cwd, options) {
   });
 
   const client = createOpencodeClient({ baseUrl: server.baseUrl });
+  let progressSubscription = null;
 
   try {
     let session;
@@ -1846,7 +1847,7 @@ export async function runOpencodeTurn(cwd, options) {
       emitProgress(onProgress, `Session ready (${session.id}).`, "starting", { threadId: session.id });
     }
 
-    const progressSubscription = streamProgress(client, onProgress);
+    progressSubscription = streamProgress(client, onProgress);
 
     let result = null;
     let failure = null;
@@ -1889,6 +1890,11 @@ export async function runOpencodeTurn(cwd, options) {
     };
   } finally {
     await server.stop();
+    // Only safe to await here, after the server is stopped: streamProgress's
+    // for-await loop may be blocked awaiting the next SSE event, and nothing
+    // else would ever unblock it — killing the server drops that connection
+    // and lets `done` resolve instead of leaving it a dangling promise.
+    await progressSubscription?.done;
   }
 }
 
@@ -2937,7 +2943,7 @@ function pushJobDetails(lines, job, options = {}) {
   if (job.status !== "queued" && job.status !== "running" && options.showResultHint) {
     lines.push(`  Result: /sgl:result ${job.id}`);
   }
-  if (job.status !== "queued" && job.status !== "running" && job.jobClass === "task" && job.write && options.showReviewHint) {
+  if (job.status !== "queued" && job.status !== "running" && job.jobClass === "task" && options.showReviewHint) {
     lines.push("  Review changes: /sgl:review --wait");
     lines.push("  Stricter review: /sgl:adversarial-review --wait");
   }
@@ -3838,9 +3844,13 @@ async function buildSetupReport(cwd, actionsTaken = []) {
     });
     structuredOutput = {
       available: supported,
+      // adversarial-review always parses leniently regardless of this probe
+      // result (see parseStructuredOutput) — this is diagnostic information
+      // about how often that fallback path is likely to trigger, not a
+      // report of different behavior the plugin takes based on the flag.
       detail: supported
-        ? "the gateway honored a response_format: json_schema request"
-        : "the gateway did not honor response_format: json_schema — adversarial-review will fall back to lenient parsing"
+        ? "the gateway honored a response_format: json_schema request during setup"
+        : "the gateway did not honor response_format: json_schema during setup — expect adversarial-review's lenient-parse fallback to trigger more often"
     };
   }
 
@@ -3938,15 +3948,13 @@ async function executeReviewRun(request) {
   ensureOpencodeAvailable(request.cwd);
   ensureGitRepository(request.cwd);
 
-  const target = resolveReviewTarget(request.cwd, { base: request.base, scope: request.scope });
+  // `target` is resolved once by the caller (handleReviewCommand) and passed
+  // in here — resolving it a second time was redundant work, and it also
+  // meant the focus-text validation below used to live here instead of
+  // before the job record was even created (see handleReviewCommand).
+  const target = request.target;
   const focusText = request.focusText?.trim() ?? "";
   const reviewName = request.reviewName;
-
-  if (reviewName === "Review" && focusText) {
-    throw new Error(
-      "`/sgl:review` does not support custom focus text. Retry with `/sgl:adversarial-review " + focusText + "` for focused review instructions."
-    );
-  }
 
   const context = collectReviewContext(request.cwd, target);
   const sglConfig = loadSglConfig();
@@ -4203,6 +4211,16 @@ async function handleReviewCommand(argv, config) {
   const cwd = resolveCommandCwd(options);
   const workspaceRoot = resolveCommandWorkspace(options);
   const focusText = positionals.join(" ").trim();
+
+  // Validate before creating a job record — this used to throw from inside
+  // executeReviewRun, which runs inside runTrackedJob, so an invalid
+  // /sgl:review <text> call left a spurious "failed" job behind.
+  if (config.reviewName === "Review" && focusText) {
+    throw new Error(
+      "`/sgl:review` does not support custom focus text. Retry with `/sgl:adversarial-review " + focusText + "` for focused review instructions."
+    );
+  }
+
   const target = resolveReviewTarget(cwd, { base: options.base, scope: options.scope });
 
   const metadata = buildReviewJobMetadata(config.reviewName, target);
@@ -4219,8 +4237,7 @@ async function handleReviewCommand(argv, config) {
     (progress) =>
       executeReviewRun({
         cwd,
-        base: options.base,
-        scope: options.scope,
+        target,
         model: options.model,
         focusText,
         reviewName: config.reviewName,
