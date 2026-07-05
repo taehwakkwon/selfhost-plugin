@@ -11,7 +11,7 @@ import {
   createJobProgressUpdater,
   runTrackedJob
 } from "./tracked-jobs.mjs";
-import { listJobs } from "./state.mjs";
+import { listJobs, readJobFile, resolveJobFile } from "./state.mjs";
 
 function initRepo() {
   const dir = createTempDir("sgl-tracked-jobs-test-");
@@ -91,6 +91,11 @@ test("runTrackedJob redacts secrets from rendered output written to the job log 
   const contents = fs.readFileSync(logFile, "utf8");
   assert.doesNotMatch(contents, new RegExp(secret));
   assert.match(contents, /\[REDACTED\]/);
+  // The persisted JSON job record must carry the same redacted value as the
+  // log file, not the raw rendered output.
+  const storedJob = readJobFile(resolveJobFile(dir, "task-3"));
+  assert.doesNotMatch(storedJob.rendered, new RegExp(secret));
+  assert.match(storedJob.rendered, /\[REDACTED\]/);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.rmSync(process.env.CLAUDE_PLUGIN_DATA, { recursive: true, force: true });
   delete process.env.CLAUDE_PLUGIN_DATA;
