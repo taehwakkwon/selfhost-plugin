@@ -69,3 +69,52 @@ test("runTrackedJob records a completed job and clears serverBaseUrl", async () 
   fs.rmSync(process.env.CLAUDE_PLUGIN_DATA, { recursive: true, force: true });
   delete process.env.CLAUDE_PLUGIN_DATA;
 });
+
+test("runTrackedJob redacts secrets from rendered output written to the job log file", async () => {
+  const dir = initRepo();
+  process.env.CLAUDE_PLUGIN_DATA = createTempDir("sgl-plugin-data-");
+  const logFile = createJobLogFile(dir, "task-3", "Test job");
+  const job = { id: "task-3", workspaceRoot: dir, title: "Test job", logFile };
+  const secret = "sk-live-super-secret-token";
+  await runTrackedJob(
+    job,
+    async () => ({
+      exitStatus: 0,
+      threadId: "session-abc",
+      turnId: "msg-1",
+      payload: { ok: true },
+      rendered: `Response used token ${secret} to authenticate`,
+      summary: "Test job finished"
+    }),
+    { secrets: [secret] }
+  );
+  const contents = fs.readFileSync(logFile, "utf8");
+  assert.doesNotMatch(contents, new RegExp(secret));
+  assert.match(contents, /\[REDACTED\]/);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(process.env.CLAUDE_PLUGIN_DATA, { recursive: true, force: true });
+  delete process.env.CLAUDE_PLUGIN_DATA;
+});
+
+test("runTrackedJob redacts secrets from a thrown error message before storing it", async () => {
+  const dir = initRepo();
+  process.env.CLAUDE_PLUGIN_DATA = createTempDir("sgl-plugin-data-");
+  const logFile = createJobLogFile(dir, "task-4", "Test job");
+  const job = { id: "task-4", workspaceRoot: dir, title: "Test job", logFile };
+  const secret = "sk-live-super-secret-token";
+  await assert.rejects(
+    runTrackedJob(
+      job,
+      async () => {
+        throw new Error(`Authorization failed: Bearer ${secret}`);
+      },
+      { secrets: [secret] }
+    )
+  );
+  const [stored] = listJobs(dir);
+  assert.doesNotMatch(stored.errorMessage, new RegExp(secret));
+  assert.match(stored.errorMessage, /\[REDACTED\]/);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(process.env.CLAUDE_PLUGIN_DATA, { recursive: true, force: true });
+  delete process.env.CLAUDE_PLUGIN_DATA;
+});

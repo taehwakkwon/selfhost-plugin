@@ -200,10 +200,13 @@ export async function runTrackedJob(job, runner, options = {}) {
       pid: null,
       completedAt
     });
-    appendLogBlock(options.logFile ?? job.logFile ?? null, "Final output", execution.rendered);
+    appendLogBlock(options.logFile ?? job.logFile ?? null, "Final output", execution.rendered, options.secrets ?? []);
     return execution;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = redactSecrets(
+      error instanceof Error ? error.message : String(error),
+      options.secrets ?? []
+    );
     const existing = readStoredJobOrNull(job.workspaceRoot, job.id) ?? runningRecord;
     const completedAt = nowIso();
     writeJobFile(job.workspaceRoot, job.id, {
