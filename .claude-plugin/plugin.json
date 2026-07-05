@@ -1,5 +1,5 @@
 {
-  "name": "sgl",
+  "name": "selfhost",
   "version": "0.1.0",
   "description": "Use a self-hosted GLM/DeepSeek gateway from Claude Code to review code or delegate tasks.",
   "author": {

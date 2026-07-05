@@ -1,11 +1,11 @@
 ---
-description: Show active and recent sgl jobs for this repository, including review-gate status
+description: Show active and recent selfhost jobs for this repository, including review-gate status
 argument-hint: '[job-id] [--wait] [--timeout-ms <ms>] [--all]'
 disable-model-invocation: true
 allowed-tools: Bash(node:*)
 ---
 
-!`node "${CLAUDE_PLUGIN_ROOT}/scripts/sgl-companion.mjs" status "$ARGUMENTS"`
+!`node "${CLAUDE_PLUGIN_ROOT}/scripts/selfhost-companion.mjs" status "$ARGUMENTS"`
 
 If the user did not pass a job ID:
 - Render the command output as a single Markdown table for the current and past runs in this session.

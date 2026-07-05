@@ -14,7 +14,7 @@ import {
 import { listJobs, readJobFile, resolveJobFile } from "./state.mjs";
 
 function initRepo() {
-  const dir = createTempDir("sgl-tracked-jobs-test-");
+  const dir = createTempDir("selfhost-tracked-jobs-test-");
   runCommandChecked("git", ["init", "-q", "-b", "main"], { cwd: dir });
   return dir;
 }
@@ -25,7 +25,7 @@ test("redactSecrets strips every occurrence of a secret value", () => {
 });
 
 test("appendLogLine redacts secrets before writing to the log file", () => {
-  const dir = createTempDir("sgl-log-test-");
+  const dir = createTempDir("selfhost-log-test-");
   const logFile = `${dir}/job.log`;
   fs.writeFileSync(logFile, "", "utf8");
   appendLogLine(logFile, "using token sk-abc123", ["sk-abc123"]);
@@ -37,7 +37,7 @@ test("appendLogLine redacts secrets before writing to the log file", () => {
 
 test("createJobProgressUpdater persists serverBaseUrl onto the job record", () => {
   const dir = initRepo();
-  process.env.CLAUDE_PLUGIN_DATA = createTempDir("sgl-plugin-data-");
+  process.env.CLAUDE_PLUGIN_DATA = createTempDir("selfhost-plugin-data-");
   const logFile = createJobLogFile(dir, "task-1", "Test job");
   const update = createJobProgressUpdater(dir, "task-1");
   update({ message: "server ready", phase: "starting", serverBaseUrl: "http://127.0.0.1:5555" });
@@ -51,7 +51,7 @@ test("createJobProgressUpdater persists serverBaseUrl onto the job record", () =
 
 test("runTrackedJob records a completed job and clears serverBaseUrl", async () => {
   const dir = initRepo();
-  process.env.CLAUDE_PLUGIN_DATA = createTempDir("sgl-plugin-data-");
+  process.env.CLAUDE_PLUGIN_DATA = createTempDir("selfhost-plugin-data-");
   const job = { id: "task-2", workspaceRoot: dir, title: "Test job" };
   await runTrackedJob(job, async () => ({
     exitStatus: 0,
@@ -72,7 +72,7 @@ test("runTrackedJob records a completed job and clears serverBaseUrl", async () 
 
 test("runTrackedJob redacts secrets from rendered output written to the job log file", async () => {
   const dir = initRepo();
-  process.env.CLAUDE_PLUGIN_DATA = createTempDir("sgl-plugin-data-");
+  process.env.CLAUDE_PLUGIN_DATA = createTempDir("selfhost-plugin-data-");
   const logFile = createJobLogFile(dir, "task-3", "Test job");
   const job = { id: "task-3", workspaceRoot: dir, title: "Test job", logFile };
   const secret = "sk-live-super-secret-token";
@@ -103,7 +103,7 @@ test("runTrackedJob redacts secrets from rendered output written to the job log 
 
 test("runTrackedJob redacts secrets nested inside execution.payload written to disk, but leaves the returned execution untouched", async () => {
   const dir = initRepo();
-  process.env.CLAUDE_PLUGIN_DATA = createTempDir("sgl-plugin-data-");
+  process.env.CLAUDE_PLUGIN_DATA = createTempDir("selfhost-plugin-data-");
   const logFile = createJobLogFile(dir, "task-5", "Test job");
   const job = { id: "task-5", workspaceRoot: dir, title: "Test job", logFile };
   const secret = "sk-abc123";
@@ -133,7 +133,7 @@ test("runTrackedJob redacts secrets nested inside execution.payload written to d
 
 test("runTrackedJob redacts secrets from execution.summary written to the state index", async () => {
   const dir = initRepo();
-  process.env.CLAUDE_PLUGIN_DATA = createTempDir("sgl-plugin-data-");
+  process.env.CLAUDE_PLUGIN_DATA = createTempDir("selfhost-plugin-data-");
   const logFile = createJobLogFile(dir, "task-6", "Test job");
   const job = { id: "task-6", workspaceRoot: dir, title: "Test job", logFile };
   const secret = "sk-live-summary-secret";
@@ -161,7 +161,7 @@ test("runTrackedJob redacts secrets from execution.summary written to the state 
 
 test("runTrackedJob redacts secrets from a thrown error message before storing it", async () => {
   const dir = initRepo();
-  process.env.CLAUDE_PLUGIN_DATA = createTempDir("sgl-plugin-data-");
+  process.env.CLAUDE_PLUGIN_DATA = createTempDir("selfhost-plugin-data-");
   const logFile = createJobLogFile(dir, "task-4", "Test job");
   const job = { id: "task-4", workspaceRoot: dir, title: "Test job", logFile };
   const secret = "sk-live-super-secret-token";
@@ -184,7 +184,7 @@ test("runTrackedJob redacts secrets from a thrown error message before storing i
 
 test("runTrackedJob rethrows a redacted error, not the original unredacted error object", async () => {
   const dir = initRepo();
-  process.env.CLAUDE_PLUGIN_DATA = createTempDir("sgl-plugin-data-");
+  process.env.CLAUDE_PLUGIN_DATA = createTempDir("selfhost-plugin-data-");
   const logFile = createJobLogFile(dir, "task-7", "Test job");
   const job = { id: "task-7", workspaceRoot: dir, title: "Test job", logFile };
   const secret = "sk-live-rethrow-secret";

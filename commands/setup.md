@@ -1,5 +1,5 @@
 ---
-description: Check whether opencode and the sgl gateway are ready, and optionally toggle the stop-time review gate
+description: Check whether opencode and the selfhost gateway are ready, and optionally toggle the stop-time review gate
 argument-hint: '[--base-url <url>] [--api-key-env <name>] [--model <alias>=<id>] [--default-model <alias>] [--enable-review-gate|--disable-review-gate]'
 allowed-tools: Bash(node:*), Bash(npm:*), AskUserQuestion
 ---
@@ -7,7 +7,7 @@ allowed-tools: Bash(node:*), Bash(npm:*), AskUserQuestion
 Run:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/sgl-companion.mjs" setup --json $ARGUMENTS
+node "${CLAUDE_PLUGIN_ROOT}/scripts/selfhost-companion.mjs" setup --json $ARGUMENTS
 ```
 
 If the result says opencode is unavailable and npm is available:
@@ -25,7 +25,7 @@ npm install -g opencode-ai
 - Then rerun:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/sgl-companion.mjs" setup --json $ARGUMENTS
+node "${CLAUDE_PLUGIN_ROOT}/scripts/selfhost-companion.mjs" setup --json $ARGUMENTS
 ```
 
 If opencode is already installed or npm is unavailable:

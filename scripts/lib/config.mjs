@@ -4,9 +4,9 @@ import path from "node:path";
 
 import { readJsonFile, writeJsonFile } from "./fs.mjs";
 
-const CONFIG_DIR_ENV = "SGL_CONFIG_DIR";
+const CONFIG_DIR_ENV = "SELFHOST_CONFIG_DIR";
 
-export const DEFAULT_SGL_CONFIG = {
+export const DEFAULT_SELFHOST_CONFIG = {
   version: 1,
   baseUrl: "https://gateway.example.com/v1",
   apiKeyEnv: "CLIENT_KEY",
@@ -19,44 +19,44 @@ export const DEFAULT_SGL_CONFIG = {
 };
 
 export function resolveConfigDir() {
-  return process.env[CONFIG_DIR_ENV] || path.join(os.homedir(), ".claude", "sgl");
+  return process.env[CONFIG_DIR_ENV] || path.join(os.homedir(), ".claude", "selfhost");
 }
 
 export function resolveConfigFile() {
   return path.join(resolveConfigDir(), "config.json");
 }
 
-export function loadSglConfig() {
+export function loadSelfhostConfig() {
   const configFile = resolveConfigFile();
   if (!fs.existsSync(configFile)) {
-    return { ...DEFAULT_SGL_CONFIG, models: { ...DEFAULT_SGL_CONFIG.models } };
+    return { ...DEFAULT_SELFHOST_CONFIG, models: { ...DEFAULT_SELFHOST_CONFIG.models } };
   }
 
   try {
     const parsed = readJsonFile(configFile);
     return {
-      ...DEFAULT_SGL_CONFIG,
+      ...DEFAULT_SELFHOST_CONFIG,
       ...parsed,
       models: {
-        ...DEFAULT_SGL_CONFIG.models,
+        ...DEFAULT_SELFHOST_CONFIG.models,
         ...(parsed.models ?? {})
       }
     };
   } catch {
-    return { ...DEFAULT_SGL_CONFIG, models: { ...DEFAULT_SGL_CONFIG.models } };
+    return { ...DEFAULT_SELFHOST_CONFIG, models: { ...DEFAULT_SELFHOST_CONFIG.models } };
   }
 }
 
-export function saveSglConfig(config) {
+export function saveSelfhostConfig(config) {
   fs.mkdirSync(resolveConfigDir(), { recursive: true });
   writeJsonFile(resolveConfigFile(), config);
   return config;
 }
 
-export function updateSglConfig(mutate) {
-  const config = loadSglConfig();
+export function updateSelfhostConfig(mutate) {
+  const config = loadSelfhostConfig();
   mutate(config);
-  return saveSglConfig(config);
+  return saveSelfhostConfig(config);
 }
 
 export function resolveModelId(config, aliasOrId) {

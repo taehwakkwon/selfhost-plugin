@@ -21,7 +21,7 @@ export function getSessionRuntimeStatus() {
   return {
     mode: "per-job",
     label: "per-job runtime",
-    detail: "Each sgl job starts its own opencode server on an ephemeral port and tears it down when the job finishes.",
+    detail: "Each selfhost job starts its own opencode server on an ephemeral port and tears it down when the job finishes.",
     endpoint: null
   };
 }
@@ -53,10 +53,10 @@ async function waitForReady(port, deadline) {
   throw new Error(`opencode serve did not become ready on port ${port} within ${READY_TIMEOUT_MS}ms.`);
 }
 
-export async function startOpencodeServer(sglConfig, permissionProfile) {
-  const configDir = createTempDir("sgl-opencode-config-");
+export async function startOpencodeServer(selfhostConfig, permissionProfile) {
+  const configDir = createTempDir("selfhost-opencode-config-");
   const configFile = path.join(configDir, "opencode.json");
-  writeJsonFile(configFile, buildOpencodeConfig(sglConfig, permissionProfile));
+  writeJsonFile(configFile, buildOpencodeConfig(selfhostConfig, permissionProfile));
 
   const port = await findFreePort();
   const child = spawn("opencode", ["serve", "--port", String(port), "--hostname", "127.0.0.1"], {
@@ -113,7 +113,7 @@ export async function startOpencodeServer(sglConfig, permissionProfile) {
 
 export function buildSessionTitle(prompt) {
   const trimmed = String(prompt ?? "").trim().replace(/\s+/g, " ");
-  return trimmed.length > 80 ? `${trimmed.slice(0, 77)}...` : trimmed || "sgl session";
+  return trimmed.length > 80 ? `${trimmed.slice(0, 77)}...` : trimmed || "selfhost session";
 }
 
 export function extractFinalText(promptResult) {
@@ -162,14 +162,14 @@ function streamProgress(client, onProgress) {
 }
 
 export async function runOpencodeTurn(cwd, options) {
-  const { sglConfig, permissionProfile, modelId, prompt, sessionId, onProgress } = options;
+  const { selfhostConfig, permissionProfile, modelId, prompt, sessionId, onProgress } = options;
 
   if (!prompt || !prompt.trim()) {
-    throw new Error("A prompt is required for this sgl run.");
+    throw new Error("A prompt is required for this selfhost run.");
   }
 
   emitProgress(onProgress, "Starting opencode server.", "starting");
-  const server = await startOpencodeServer(sglConfig, permissionProfile);
+  const server = await startOpencodeServer(selfhostConfig, permissionProfile);
   emitProgress(onProgress, `opencode server ready on port ${server.port}.`, "starting", {
     serverBaseUrl: server.baseUrl
   });
@@ -255,7 +255,7 @@ export function parseStructuredOutput(rawOutput, fallback = {}) {
   if (!rawOutput) {
     return {
       parsed: null,
-      parseError: fallback.failureMessage ?? "sgl did not return a final structured message.",
+      parseError: fallback.failureMessage ?? "selfhost did not return a final structured message.",
       rawOutput: rawOutput ?? "",
       ...fallback
     };

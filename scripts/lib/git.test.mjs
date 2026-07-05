@@ -8,7 +8,7 @@ import { runCommandChecked } from "./process.mjs";
 import { resolveReviewTarget, collectReviewContext } from "./git.mjs";
 
 function initRepo() {
-  const dir = createTempDir("sgl-git-test-");
+  const dir = createTempDir("selfhost-git-test-");
   runCommandChecked("git", ["init", "-q", "-b", "main"], { cwd: dir });
   runCommandChecked("git", ["config", "user.email", "test@example.com"], { cwd: dir });
   runCommandChecked("git", ["config", "user.name", "Test"], { cwd: dir });

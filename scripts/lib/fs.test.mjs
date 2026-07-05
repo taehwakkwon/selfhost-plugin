@@ -6,7 +6,7 @@ import path from "node:path";
 import { createTempDir, readJsonFile, writeJsonFile, isProbablyText } from "./fs.mjs";
 
 test("writeJsonFile then readJsonFile round-trips", () => {
-  const dir = createTempDir("sgl-fs-test-");
+  const dir = createTempDir("selfhost-fs-test-");
   const file = path.join(dir, "config.json");
   writeJsonFile(file, { hello: "world" });
   assert.deepEqual(readJsonFile(file), { hello: "world" });

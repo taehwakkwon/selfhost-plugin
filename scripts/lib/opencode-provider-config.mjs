@@ -1,13 +1,13 @@
-export const PROVIDER_ID = "sgl-gateway";
+export const PROVIDER_ID = "selfhost-gateway";
 
 const PERMISSION_PROFILES = {
   rescue: { edit: "allow", bash: "allow" },
   review: { edit: "deny", bash: "deny" }
 };
 
-export function buildOpencodeConfig(sglConfig, permissionProfile) {
-  if (!sglConfig.baseUrl) {
-    throw new Error("No gateway base URL configured. Run /sgl:setup --base-url <url> first.");
+export function buildOpencodeConfig(selfhostConfig, permissionProfile) {
+  if (!selfhostConfig.baseUrl) {
+    throw new Error("No gateway base URL configured. Run /selfhost:setup --base-url <url> first.");
   }
 
   const permission = PERMISSION_PROFILES[permissionProfile];
@@ -16,7 +16,7 @@ export function buildOpencodeConfig(sglConfig, permissionProfile) {
   }
 
   const models = {};
-  for (const modelId of new Set(Object.values(sglConfig.models ?? {}))) {
+  for (const modelId of new Set(Object.values(selfhostConfig.models ?? {}))) {
     models[modelId] = { name: modelId };
   }
 
@@ -25,10 +25,10 @@ export function buildOpencodeConfig(sglConfig, permissionProfile) {
     provider: {
       [PROVIDER_ID]: {
         npm: "@ai-sdk/openai-compatible",
-        name: "sgl gateway",
+        name: "selfhost gateway",
         options: {
-          baseURL: sglConfig.baseUrl,
-          apiKey: `{env:${sglConfig.apiKeyEnv}}`
+          baseURL: selfhostConfig.baseUrl,
+          apiKey: `{env:${selfhostConfig.apiKeyEnv}}`
         },
         models
       }

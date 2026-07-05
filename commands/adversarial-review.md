@@ -1,11 +1,11 @@
 ---
-description: Run an sgl review that challenges the implementation approach and design choices
+description: Run an selfhost review that challenges the implementation approach and design choices
 argument-hint: '[--wait|--background] [--base <ref>] [--scope auto|working-tree|branch] [focus ...]'
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Bash(node:*), Bash(git:*), AskUserQuestion
 ---
 
-Run an adversarial sgl review through the shared plugin runtime.
+Run an adversarial selfhost review through the shared plugin runtime.
 Position it as a challenge review that questions the chosen implementation, design choices, tradeoffs, and assumptions.
 It is not just a stricter pass over implementation defects.
 
@@ -15,7 +15,7 @@ Raw slash-command arguments:
 Core constraint:
 - This command is review-only.
 - Do not fix issues, apply patches, or suggest that you are about to make changes.
-- Your only job is to run the review and return sgl's output verbatim to the user.
+- Your only job is to run the review and return selfhost's output verbatim to the user.
 - Keep the framing focused on whether the current approach is the right one, what assumptions it depends on, and where the design could fail under real-world conditions.
 
 Execution mode rules:
@@ -39,14 +39,14 @@ Argument handling:
 - Do not strip `--wait` or `--background` yourself.
 - Do not weaken the adversarial framing or rewrite the user's focus text.
 - The companion script parses `--wait` and `--background`, but Claude Code's `Bash(..., run_in_background: true)` is what actually detaches the run.
-- `/sgl:adversarial-review` uses the same review target selection as `/sgl:review`.
+- `/selfhost:adversarial-review` uses the same review target selection as `/selfhost:review`.
 - It supports working-tree review, branch review, and `--base <ref>`.
-- Unlike `/sgl:review`, it can still take extra focus text after the flags.
+- Unlike `/selfhost:review`, it can still take extra focus text after the flags.
 
 Foreground flow:
 - Run:
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/sgl-companion.mjs" adversarial-review "$ARGUMENTS"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/selfhost-companion.mjs" adversarial-review "$ARGUMENTS"
 ```
 - Return the command stdout verbatim, exactly as-is.
 - Do not paraphrase, summarize, or add commentary before or after it.
@@ -56,10 +56,10 @@ Background flow:
 - Launch the review with `Bash` in the background:
 ```typescript
 Bash({
-  command: `node "${CLAUDE_PLUGIN_ROOT}/scripts/sgl-companion.mjs" adversarial-review "$ARGUMENTS"`,
-  description: "sgl adversarial review",
+  command: `node "${CLAUDE_PLUGIN_ROOT}/scripts/selfhost-companion.mjs" adversarial-review "$ARGUMENTS"`,
+  description: "selfhost adversarial review",
   run_in_background: true
 })
 ```
 - Do not call `BashOutput` or wait for completion in this turn.
-- After launching the command, tell the user: "sgl adversarial review started in the background. Check `/sgl:status` for progress."
+- After launching the command, tell the user: "selfhost adversarial review started in the background. Check `/selfhost:status` for progress."

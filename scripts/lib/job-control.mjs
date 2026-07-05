@@ -195,7 +195,7 @@ function matchJobReference(jobs, reference, predicate = () => true) {
     throw new Error(`Job reference "${reference}" is ambiguous. Use a longer job id.`);
   }
 
-  throw new Error(`No job found for "${reference}". Run /sgl:status to list known jobs.`);
+  throw new Error(`No job found for "${reference}". Run /selfhost:status to list known jobs.`);
 }
 
 export function buildStatusSnapshot(cwd, options = {}) {
@@ -232,7 +232,7 @@ export function buildSingleJobSnapshot(cwd, reference, options = {}) {
   const jobs = sortJobsNewestFirst(listJobs(workspaceRoot));
   const selected = matchJobReference(jobs, reference);
   if (!selected) {
-    throw new Error(`No job found for "${reference}". Run /sgl:status to inspect known jobs.`);
+    throw new Error(`No job found for "${reference}". Run /selfhost:status to inspect known jobs.`);
   }
 
   return {
@@ -256,14 +256,14 @@ export function resolveResultJob(cwd, reference) {
 
   const active = matchJobReference(jobs, reference, (job) => job.status === "queued" || job.status === "running");
   if (active) {
-    throw new Error(`Job ${active.id} is still ${active.status}. Check /sgl:status and try again once it finishes.`);
+    throw new Error(`Job ${active.id} is still ${active.status}. Check /selfhost:status and try again once it finishes.`);
   }
 
   if (reference) {
-    throw new Error(`No finished job found for "${reference}". Run /sgl:status to inspect active jobs.`);
+    throw new Error(`No finished job found for "${reference}". Run /selfhost:status to inspect active jobs.`);
   }
 
-  throw new Error("No finished sgl jobs found for this repository yet.");
+  throw new Error("No finished selfhost jobs found for this repository yet.");
 }
 
 export function resolveCancelableJob(cwd, reference, options = {}) {
@@ -285,12 +285,12 @@ export function resolveCancelableJob(cwd, reference, options = {}) {
     return { workspaceRoot, job: sessionScopedActiveJobs[0] };
   }
   if (sessionScopedActiveJobs.length > 1) {
-    throw new Error("Multiple sgl jobs are active. Pass a job id to /sgl:cancel.");
+    throw new Error("Multiple selfhost jobs are active. Pass a job id to /selfhost:cancel.");
   }
 
   if (getCurrentSessionId(options)) {
-    throw new Error("No active sgl jobs to cancel for this session.");
+    throw new Error("No active selfhost jobs to cancel for this session.");
   }
 
-  throw new Error("No active sgl jobs to cancel.");
+  throw new Error("No active selfhost jobs to cancel.");
 }

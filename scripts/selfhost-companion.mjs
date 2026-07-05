@@ -7,7 +7,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { parseArgs, splitRawArgumentString } from "./lib/args.mjs";
-import { loadSglConfig, updateSglConfig, resolveModelId } from "./lib/config.mjs";
+import { loadSelfhostConfig, updateSelfhostConfig, resolveModelId } from "./lib/config.mjs";
 import {
   getOpencodeAvailability,
   getSessionRuntimeStatus,
@@ -71,14 +71,14 @@ function printUsage() {
   console.log(
     [
       "Usage:",
-      "  node scripts/sgl-companion.mjs setup [--base-url <url>] [--api-key-env <name>] [--model <alias>=<id>] [--default-model <alias>] [--enable-review-gate|--disable-review-gate] [--json]",
-      "  node scripts/sgl-companion.mjs review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>]",
-      "  node scripts/sgl-companion.mjs adversarial-review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [focus text]",
-      "  node scripts/sgl-companion.mjs task [--background] [--resume-last|--resume|--fresh] [--model <alias>] [prompt]",
-      "  node scripts/sgl-companion.mjs status [job-id] [--all] [--json]",
-      "  node scripts/sgl-companion.mjs result [job-id] [--json]",
-      "  node scripts/sgl-companion.mjs cancel [job-id] [--json]",
-      "  node scripts/sgl-companion.mjs stop-review [--json] [claude response text]"
+      "  node scripts/selfhost-companion.mjs setup [--base-url <url>] [--api-key-env <name>] [--model <alias>=<id>] [--default-model <alias>] [--enable-review-gate|--disable-review-gate] [--json]",
+      "  node scripts/selfhost-companion.mjs review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>]",
+      "  node scripts/selfhost-companion.mjs adversarial-review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [focus text]",
+      "  node scripts/selfhost-companion.mjs task [--background] [--resume-last|--resume|--fresh] [--model <alias>] [prompt]",
+      "  node scripts/selfhost-companion.mjs status [job-id] [--all] [--json]",
+      "  node scripts/selfhost-companion.mjs result [job-id] [--json]",
+      "  node scripts/selfhost-companion.mjs cancel [job-id] [--json]",
+      "  node scripts/selfhost-companion.mjs stop-review [--json] [claude response text]"
     ].join("\n")
   );
 }
@@ -144,14 +144,14 @@ function firstMeaningfulLine(text, fallback) {
   return line ?? fallback;
 }
 
-async function probeGatewayReachability(sglConfig) {
-  const token = process.env[sglConfig.apiKeyEnv];
+async function probeGatewayReachability(selfhostConfig) {
+  const token = process.env[selfhostConfig.apiKeyEnv];
   if (!token) {
-    return { available: false, detail: `Environment variable ${sglConfig.apiKeyEnv} is not set.` };
+    return { available: false, detail: `Environment variable ${selfhostConfig.apiKeyEnv} is not set.` };
   }
-  const defaultModelId = resolveModelId(sglConfig, undefined);
+  const defaultModelId = resolveModelId(selfhostConfig, undefined);
   try {
-    const response = await fetch(`${sglConfig.baseUrl}/chat/completions`, {
+    const response = await fetch(`${selfhostConfig.baseUrl}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify({ model: defaultModelId, messages: [{ role: "user", content: "hi" }], max_tokens: 1 }),
@@ -160,20 +160,20 @@ async function probeGatewayReachability(sglConfig) {
     if (!response.ok) {
       return { available: false, detail: `Gateway responded with HTTP ${response.status}.` };
     }
-    return { available: true, detail: `Reachable at ${sglConfig.baseUrl} (model ${defaultModelId}).` };
+    return { available: true, detail: `Reachable at ${selfhostConfig.baseUrl} (model ${defaultModelId}).` };
   } catch (error) {
     return { available: false, detail: error instanceof Error ? error.message : String(error) };
   }
 }
 
-async function probeStructuredOutputSupport(sglConfig) {
-  const token = process.env[sglConfig.apiKeyEnv];
+async function probeStructuredOutputSupport(selfhostConfig) {
+  const token = process.env[selfhostConfig.apiKeyEnv];
   if (!token) {
     return null;
   }
-  const defaultModelId = resolveModelId(sglConfig, undefined);
+  const defaultModelId = resolveModelId(selfhostConfig, undefined);
   try {
-    const response = await fetch(`${sglConfig.baseUrl}/chat/completions`, {
+    const response = await fetch(`${selfhostConfig.baseUrl}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify({
@@ -206,21 +206,21 @@ async function buildSetupReport(cwd, actionsTaken = []) {
   const workspaceRoot = resolveWorkspaceRoot(cwd);
   const nodeStatus = binaryAvailable("node", ["--version"], { cwd });
   const opencodeStatus = getOpencodeAvailability(cwd);
-  let sglConfig = loadSglConfig();
-  const gateway = await probeGatewayReachability(sglConfig);
+  let selfhostConfig = loadSelfhostConfig();
+  const gateway = await probeGatewayReachability(selfhostConfig);
 
   const nextSteps = [];
   if (!opencodeStatus.available) {
-    nextSteps.push("Install opencode (see https://opencode.ai) so /sgl:rescue and /sgl:review have an execution engine.");
+    nextSteps.push("Install opencode (see https://opencode.ai) so /selfhost:rescue and /selfhost:review have an execution engine.");
   }
   if (!gateway.available) {
     nextSteps.push(`Fix gateway connectivity: ${gateway.detail}`);
   }
 
-  let structuredOutput = { available: sglConfig.structuredOutputSupported, detail: "not probed" };
+  let structuredOutput = { available: selfhostConfig.structuredOutputSupported, detail: "not probed" };
   if (opencodeStatus.available && gateway.available) {
-    const supported = await probeStructuredOutputSupport(sglConfig);
-    sglConfig = updateSglConfig((config) => {
+    const supported = await probeStructuredOutputSupport(selfhostConfig);
+    selfhostConfig = updateSelfhostConfig((config) => {
       config.structuredOutputSupported = supported;
     });
     structuredOutput = {
@@ -265,7 +265,7 @@ async function handleSetup(argv) {
   const actionsTaken = [];
 
   if (options["base-url"] || options["api-key-env"] || options["default-model"] || options.model) {
-    updateSglConfig((config) => {
+    updateSelfhostConfig((config) => {
       if (options["base-url"]) {
         config.baseUrl = options["base-url"];
         actionsTaken.push(`Set gateway base URL to ${options["base-url"]}.`);
@@ -304,20 +304,20 @@ async function handleSetup(argv) {
 function ensureOpencodeAvailable(cwd) {
   const availability = getOpencodeAvailability(cwd);
   if (!availability.available) {
-    throw new Error("opencode CLI is not installed. Install it (see https://opencode.ai), then rerun `/sgl:setup`.");
+    throw new Error("opencode CLI is not installed. Install it (see https://opencode.ai), then rerun `/selfhost:setup`.");
   }
 }
 
 function buildReviewJobMetadata(reviewName, target) {
   return {
     kind: reviewName === "Adversarial Review" ? "adversarial-review" : "review",
-    title: reviewName === "Review" ? "sgl Review" : `sgl ${reviewName}`,
+    title: reviewName === "Review" ? "selfhost Review" : `selfhost ${reviewName}`,
     summary: `${reviewName} ${target.label}`
   };
 }
 
 function buildTaskRunMetadata({ prompt, resumeLast = false }) {
-  const title = resumeLast ? "sgl Resume" : "sgl Rescue";
+  const title = resumeLast ? "selfhost Resume" : "selfhost Rescue";
   const fallbackSummary = resumeLast ? DEFAULT_CONTINUE_PROMPT : "Task";
   return {
     title,
@@ -338,8 +338,8 @@ async function executeReviewRun(request) {
   const reviewName = request.reviewName;
 
   const context = collectReviewContext(request.cwd, target);
-  const sglConfig = loadSglConfig();
-  const modelId = resolveModelId(sglConfig, request.model);
+  const selfhostConfig = loadSelfhostConfig();
+  const modelId = resolveModelId(selfhostConfig, request.model);
 
   let prompt;
   if (reviewName === "Adversarial Review") {
@@ -362,7 +362,7 @@ async function executeReviewRun(request) {
   }
 
   const result = await runOpencodeTurn(request.cwd, {
-    sglConfig,
+    selfhostConfig,
     permissionProfile: "review",
     modelId,
     prompt,
@@ -391,7 +391,7 @@ async function executeReviewRun(request) {
       payload,
       rendered: renderReviewResult(parsed, { reviewLabel: reviewName, targetLabel: target.label }),
       summary: parsed.parsed?.summary ?? parsed.parseError ?? firstMeaningfulLine(result.finalMessage, `${reviewName} finished.`),
-      jobTitle: `sgl ${reviewName}`,
+      jobTitle: `selfhost ${reviewName}`,
       jobClass: "review",
       targetLabel: target.label
     };
@@ -410,7 +410,7 @@ async function executeReviewRun(request) {
     payload,
     rendered: renderPlainReviewResult(result, { reviewLabel: reviewName, targetLabel: target.label }),
     summary: firstMeaningfulLine(result.finalMessage, `${reviewName} finished.`),
-    jobTitle: `sgl ${reviewName}`,
+    jobTitle: `selfhost ${reviewName}`,
     jobClass: "review",
     targetLabel: target.label
   };
@@ -443,7 +443,7 @@ function resolveLatestTrackedTaskThread(workspaceRoot, options = {}) {
     (job) => job.jobClass === "task" && (job.status === "queued" || job.status === "running")
   );
   if (activeTask) {
-    throw new Error(`Task ${activeTask.id} is still running. Use /sgl:status before continuing it.`);
+    throw new Error(`Task ${activeTask.id} is still running. Use /selfhost:status before continuing it.`);
   }
 
   const trackedTask = findLatestResumableTaskJob(visibleJobs);
@@ -460,7 +460,7 @@ async function executeTaskRun(request) {
   if (request.resumeLast) {
     const latestThread = resolveLatestTrackedTaskThread(workspaceRoot, { excludeJobId: request.jobId });
     if (!latestThread) {
-      throw new Error("No previous sgl rescue session was found for this repository.");
+      throw new Error("No previous selfhost rescue session was found for this repository.");
     }
     resumeSessionId = latestThread.id;
   }
@@ -469,11 +469,11 @@ async function executeTaskRun(request) {
     throw new Error("Provide a prompt, a prompt file, piped stdin, or use --resume-last.");
   }
 
-  const sglConfig = loadSglConfig();
-  const modelId = resolveModelId(sglConfig, request.model);
+  const selfhostConfig = loadSelfhostConfig();
+  const modelId = resolveModelId(selfhostConfig, request.model);
 
   const result = await runOpencodeTurn(request.cwd, {
-    sglConfig,
+    selfhostConfig,
     permissionProfile: "rescue",
     modelId,
     prompt: request.prompt?.trim() || DEFAULT_CONTINUE_PROMPT,
@@ -512,8 +512,8 @@ function createCompanionJob({ prefix, kind, title, workspaceRoot, jobClass, summ
 
 function createTrackedProgress(job, options = {}) {
   const logFile = options.logFile ?? createJobLogFile(job.workspaceRoot, job.id, job.title);
-  const sglConfig = loadSglConfig();
-  const secrets = [process.env[sglConfig.apiKeyEnv]].filter(Boolean);
+  const selfhostConfig = loadSelfhostConfig();
+  const secrets = [process.env[selfhostConfig.apiKeyEnv]].filter(Boolean);
   return {
     logFile,
     secrets,
@@ -544,7 +544,7 @@ async function runForegroundCommand(job, runner, options = {}) {
 }
 
 function spawnDetachedTaskWorker(cwd, jobId) {
-  const scriptPath = path.join(ROOT_DIR, "scripts", "sgl-companion.mjs");
+  const scriptPath = path.join(ROOT_DIR, "scripts", "selfhost-companion.mjs");
   const child = spawn(process.execPath, [scriptPath, "task-worker", "--cwd", cwd, "--job-id", jobId], {
     cwd,
     env: process.env,
@@ -602,10 +602,10 @@ async function handleReviewCommand(argv, config) {
 
   // Validate before creating a job record — this used to throw from inside
   // executeReviewRun, which runs inside runTrackedJob, so an invalid
-  // /sgl:review <text> call left a spurious "failed" job behind.
+  // /selfhost:review <text> call left a spurious "failed" job behind.
   if (config.reviewName === "Review" && focusText) {
     throw new Error(
-      "`/sgl:review` does not support custom focus text. Retry with `/sgl:adversarial-review " + focusText + "` for focused review instructions."
+      "`/selfhost:review` does not support custom focus text. Retry with `/selfhost:adversarial-review " + focusText + "` for focused review instructions."
     );
   }
 
@@ -669,7 +669,7 @@ async function handleTask(argv) {
     });
     const request = { cwd, model: options.model, prompt, resumeLast, jobId: job.id };
     const { payload } = enqueueBackgroundTask(cwd, job, request);
-    outputCommandResult(payload, `${payload.title} started in the background as ${payload.jobId}. Check /sgl:status ${payload.jobId} for progress.\n`, options.json);
+    outputCommandResult(payload, `${payload.title} started in the background as ${payload.jobId}. Check /selfhost:status ${payload.jobId} for progress.\n`, options.json);
     return;
   }
 
@@ -826,8 +826,8 @@ async function handleCancel(argv) {
 
 async function executeStopReviewRun(request) {
   ensureOpencodeAvailable(request.cwd);
-  const sglConfig = loadSglConfig();
-  const modelId = resolveModelId(sglConfig, request.model);
+  const selfhostConfig = loadSelfhostConfig();
+  const modelId = resolveModelId(selfhostConfig, request.model);
   const template = loadPromptTemplate(ROOT_DIR, "stop-review-gate");
 
   // The "review" permission profile denies bash, so the model cannot run `git` itself here.
@@ -848,7 +848,7 @@ async function executeStopReviewRun(request) {
   });
 
   const result = await runOpencodeTurn(request.cwd, {
-    sglConfig,
+    selfhostConfig,
     permissionProfile: "review",
     modelId,
     prompt,
@@ -863,7 +863,7 @@ async function executeStopReviewRun(request) {
     payload: { status: result.status, threadId: result.threadId, rawOutput },
     rendered: rawOutput.endsWith("\n") ? rawOutput : `${rawOutput}\n`,
     summary: firstMeaningfulLine(rawOutput, "Stop-gate review finished."),
-    jobTitle: "sgl Stop Gate Review",
+    jobTitle: "selfhost Stop Gate Review",
     jobClass: "review"
   };
 }
@@ -880,7 +880,7 @@ async function handleStopReview(argv) {
   const job = createCompanionJob({
     prefix: "stopreview",
     kind: "stop-review",
-    title: "sgl Stop Gate Review",
+    title: "selfhost Stop Gate Review",
     workspaceRoot,
     jobClass: "review",
     summary: "Stop-gate review of previous Claude turn"
