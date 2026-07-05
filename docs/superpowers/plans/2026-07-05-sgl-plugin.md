@@ -2191,6 +2191,11 @@ export async function runTrackedJob(job, runner, options = {}) {
     const execution = await runner();
     const completionStatus = execution.exitStatus === 0 ? "completed" : "failed";
     const completedAt = nowIso();
+    // Redact once and reuse the same value for the state file and the log
+    // file — writing the raw string to one and the redacted string to the
+    // other left a secret sitting in the JSON job record even after the
+    // log file itself was fixed.
+    const redactedRendered = redactSecrets(String(execution.rendered ?? ""), options.secrets ?? []);
     writeJobFile(job.workspaceRoot, job.id, {
       ...runningRecord,
       status: completionStatus,
@@ -2201,7 +2206,7 @@ export async function runTrackedJob(job, runner, options = {}) {
       phase: completionStatus === "completed" ? "done" : "failed",
       completedAt,
       result: execution.payload,
-      rendered: execution.rendered
+      rendered: redactedRendered
     });
     upsertJob(job.workspaceRoot, {
       id: job.id,
@@ -2214,7 +2219,7 @@ export async function runTrackedJob(job, runner, options = {}) {
       pid: null,
       completedAt
     });
-    appendLogBlock(options.logFile ?? job.logFile ?? null, "Final output", execution.rendered, options.secrets ?? []);
+    appendLogBlock(options.logFile ?? job.logFile ?? null, "Final output", redactedRendered);
     return execution;
   } catch (error) {
     const errorMessage = redactSecrets(
