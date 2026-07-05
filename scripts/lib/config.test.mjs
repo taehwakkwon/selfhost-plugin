@@ -4,11 +4,11 @@ import fs from "node:fs";
 
 import { createTempDir } from "./fs.mjs";
 
-function withTempConfigDir(fn) {
+async function withTempConfigDir(fn) {
   const dir = createTempDir("sgl-config-test-");
   process.env.SGL_CONFIG_DIR = dir;
   try {
-    return fn(dir);
+    return await fn(dir);
   } finally {
     delete process.env.SGL_CONFIG_DIR;
     fs.rmSync(dir, { recursive: true, force: true });
