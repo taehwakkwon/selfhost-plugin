@@ -4150,6 +4150,28 @@ function spawnDetachedTaskWorker(cwd, jobId) {
     stdio: "ignore",
     windowsHide: true
   });
+  child.on("error", (error) => {
+    // Spawn failures (EMFILE/EAGAIN, or `cwd` vanishing) emit 'error'
+    // asynchronously, after this function has already returned control to
+    // the caller — an unhandled listener here would crash the whole host
+    // process (the same bug class opencode.mjs's startOpencodeServer was
+    // fixed for in Task 7). Mark the job failed instead of leaving it
+    // stuck in "queued" forever.
+    try {
+      const workspaceRoot = resolveWorkspaceRoot(cwd);
+      upsertJob(workspaceRoot, {
+        id: jobId,
+        status: "failed",
+        phase: "failed",
+        pid: null,
+        errorMessage: `Failed to start background worker: ${error.message}`,
+        completedAt: nowIso()
+      });
+    } catch {
+      // Best effort — if the job record can't be updated either, there's
+      // nothing further to do from a detached spawn's error handler.
+    }
+  });
   child.unref();
   return child;
 }
