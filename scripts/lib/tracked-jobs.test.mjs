@@ -101,6 +101,64 @@ test("runTrackedJob redacts secrets from rendered output written to the job log 
   delete process.env.CLAUDE_PLUGIN_DATA;
 });
 
+test("runTrackedJob redacts secrets nested inside execution.payload written to disk, but leaves the returned execution untouched", async () => {
+  const dir = initRepo();
+  process.env.CLAUDE_PLUGIN_DATA = createTempDir("sgl-plugin-data-");
+  const logFile = createJobLogFile(dir, "task-5", "Test job");
+  const job = { id: "task-5", workspaceRoot: dir, title: "Test job", logFile };
+  const secret = "sk-abc123";
+  const execution = await runTrackedJob(
+    job,
+    async () => ({
+      exitStatus: 0,
+      threadId: "session-abc",
+      turnId: "msg-1",
+      payload: { status: 0, opencode: { stderr: `using token ${secret}` } },
+      rendered: "done",
+      summary: "Test job finished"
+    }),
+    { secrets: [secret] }
+  );
+  const storedJob = readJobFile(resolveJobFile(dir, "task-5"));
+  const storedJson = JSON.stringify(storedJob.result);
+  assert.doesNotMatch(storedJson, new RegExp(secret));
+  assert.match(storedJson, /\[REDACTED\]/);
+  // The value returned to the caller (used for the same-session stdout) is a
+  // different concern from what's persisted to disk, and must stay intact.
+  assert.equal(execution.payload.opencode.stderr, `using token ${secret}`);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(process.env.CLAUDE_PLUGIN_DATA, { recursive: true, force: true });
+  delete process.env.CLAUDE_PLUGIN_DATA;
+});
+
+test("runTrackedJob redacts secrets from execution.summary written to the state index", async () => {
+  const dir = initRepo();
+  process.env.CLAUDE_PLUGIN_DATA = createTempDir("sgl-plugin-data-");
+  const logFile = createJobLogFile(dir, "task-6", "Test job");
+  const job = { id: "task-6", workspaceRoot: dir, title: "Test job", logFile };
+  const secret = "sk-live-summary-secret";
+  await runTrackedJob(
+    job,
+    async () => ({
+      exitStatus: 0,
+      threadId: "session-abc",
+      turnId: "msg-1",
+      payload: { ok: true },
+      rendered: "done",
+      summary: `Finished using token ${secret}`
+    }),
+    { secrets: [secret] }
+  );
+  // `summary` is only persisted via upsertJob into the shared state.json
+  // index (listJobs), not into the per-job JSON file.
+  const [stored] = listJobs(dir);
+  assert.doesNotMatch(stored.summary, new RegExp(secret));
+  assert.match(stored.summary, /\[REDACTED\]/);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(process.env.CLAUDE_PLUGIN_DATA, { recursive: true, force: true });
+  delete process.env.CLAUDE_PLUGIN_DATA;
+});
+
 test("runTrackedJob redacts secrets from a thrown error message before storing it", async () => {
   const dir = initRepo();
   process.env.CLAUDE_PLUGIN_DATA = createTempDir("sgl-plugin-data-");
