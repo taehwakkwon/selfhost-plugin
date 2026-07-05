@@ -175,6 +175,7 @@ export async function runOpencodeTurn(cwd, options) {
   });
 
   const client = createOpencodeClient({ baseUrl: server.baseUrl });
+  let progressSubscription = null;
 
   try {
     let session;
@@ -186,7 +187,7 @@ export async function runOpencodeTurn(cwd, options) {
       emitProgress(onProgress, `Session ready (${session.id}).`, "starting", { threadId: session.id });
     }
 
-    const progressSubscription = streamProgress(client, onProgress);
+    progressSubscription = streamProgress(client, onProgress);
 
     let result = null;
     let failure = null;
@@ -229,6 +230,11 @@ export async function runOpencodeTurn(cwd, options) {
     };
   } finally {
     await server.stop();
+    // Only safe to await here, after the server is stopped: streamProgress's
+    // for-await loop may be blocked awaiting the next SSE event, and nothing
+    // else would ever unblock it — killing the server drops that connection
+    // and lets `done` resolve instead of leaving it a dangling promise.
+    await progressSubscription?.done;
   }
 }
 

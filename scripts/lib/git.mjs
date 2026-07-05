@@ -293,7 +293,7 @@ function buildAdversarialCollectionGuidance(options = {}) {
     return "Use the repository context below as primary evidence.";
   }
 
-  return "The repository context below is a lightweight summary. The full diff was too large to inline — use the `read` tool on the files listed under Changed Files to inspect them directly before finalizing findings. You do not have shell/bash access in this session.";
+  return "The repository context below is a lightweight summary. The full diff was too large to inline — use the `read`, `grep`, and `glob` tools to inspect the files listed under Changed Files directly before finalizing findings. You do not have shell/bash access in this session.";
 }
 
 export function collectReviewContext(cwd, target, options = {}) {
