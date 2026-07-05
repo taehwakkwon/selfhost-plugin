@@ -2034,6 +2034,27 @@ export function redactSecrets(text, secrets = []) {
   return result;
 }
 
+// Deep variant for arbitrary execution payloads (rescue vs. review jobs
+// have different shapes) — redacts every string leaf and preserves the
+// original structure, so `result: execution.payload` in a job's persisted
+// JSON record can't carry a secret in a field nobody thought to name.
+export function redactSecretsDeep(value, secrets = []) {
+  if (typeof value === "string") {
+    return redactSecrets(value, secrets);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSecretsDeep(item, secrets));
+  }
+  if (value && typeof value === "object") {
+    const result = {};
+    for (const [key, val] of Object.entries(value)) {
+      result[key] = redactSecretsDeep(val, secrets);
+    }
+    return result;
+  }
+  return value;
+}
+
 function normalizeProgressEvent(value) {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     return {
@@ -2194,8 +2215,12 @@ export async function runTrackedJob(job, runner, options = {}) {
     // Redact once and reuse the same value for the state file and the log
     // file — writing the raw string to one and the redacted string to the
     // other left a secret sitting in the JSON job record even after the
-    // log file itself was fixed.
+    // log file itself was fixed. `payload` and `summary` go through the
+    // same treatment: both are runner-derived just like `rendered`, and
+    // `payload`'s shape varies by job type, hence the deep variant.
     const redactedRendered = redactSecrets(String(execution.rendered ?? ""), options.secrets ?? []);
+    const redactedPayload = redactSecretsDeep(execution.payload, options.secrets ?? []);
+    const redactedSummary = redactSecrets(String(execution.summary ?? ""), options.secrets ?? []);
     writeJobFile(job.workspaceRoot, job.id, {
       ...runningRecord,
       status: completionStatus,
@@ -2205,7 +2230,7 @@ export async function runTrackedJob(job, runner, options = {}) {
       pid: null,
       phase: completionStatus === "completed" ? "done" : "failed",
       completedAt,
-      result: execution.payload,
+      result: redactedPayload,
       rendered: redactedRendered
     });
     upsertJob(job.workspaceRoot, {
@@ -2214,7 +2239,7 @@ export async function runTrackedJob(job, runner, options = {}) {
       threadId: execution.threadId ?? null,
       turnId: execution.turnId ?? null,
       serverBaseUrl: null,
-      summary: execution.summary,
+      summary: redactedSummary,
       phase: completionStatus === "completed" ? "done" : "failed",
       pid: null,
       completedAt
