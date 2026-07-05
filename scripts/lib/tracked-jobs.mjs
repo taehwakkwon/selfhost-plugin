@@ -254,6 +254,13 @@ export async function runTrackedJob(job, runner, options = {}) {
       errorMessage,
       completedAt
     });
-    throw error;
+    // Rethrow the redacted message, not the original `error` — the caller
+    // (and sgl-companion.mjs's top-level main().catch, which prints
+    // error.message to stderr unredacted) would otherwise leak whatever
+    // this function just redacted for disk. A server-start failure that
+    // echoes a secret into its own stderr (opencode.mjs's "opencode serve
+    // exited before becoming ready: ${stderr}") is exactly the shape that
+    // reaches here.
+    throw new Error(errorMessage);
   }
 }
