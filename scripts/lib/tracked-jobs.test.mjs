@@ -181,3 +181,30 @@ test("runTrackedJob redacts secrets from a thrown error message before storing i
   fs.rmSync(process.env.CLAUDE_PLUGIN_DATA, { recursive: true, force: true });
   delete process.env.CLAUDE_PLUGIN_DATA;
 });
+
+test("runTrackedJob rethrows a redacted error, not the original unredacted error object", async () => {
+  const dir = initRepo();
+  process.env.CLAUDE_PLUGIN_DATA = createTempDir("sgl-plugin-data-");
+  const logFile = createJobLogFile(dir, "task-7", "Test job");
+  const job = { id: "task-7", workspaceRoot: dir, title: "Test job", logFile };
+  const secret = "sk-live-rethrow-secret";
+  await assert.rejects(
+    runTrackedJob(
+      job,
+      async () => {
+        // Mirrors opencode.mjs's startOpencodeServer, which embeds a
+        // subprocess's raw stderr straight into the Error message.
+        throw new Error(`opencode serve exited before becoming ready: ${secret}`);
+      },
+      { secrets: [secret] }
+    ),
+    (thrown) => {
+      assert.doesNotMatch(thrown.message, new RegExp(secret));
+      assert.match(thrown.message, /\[REDACTED\]/);
+      return true;
+    }
+  );
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(process.env.CLAUDE_PLUGIN_DATA, { recursive: true, force: true });
+  delete process.env.CLAUDE_PLUGIN_DATA;
+});
