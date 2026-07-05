@@ -151,7 +151,7 @@ function pushJobDetails(lines, job, options = {}) {
   if (job.status !== "queued" && job.status !== "running" && options.showResultHint) {
     lines.push(`  Result: /sgl:result ${job.id}`);
   }
-  if (job.status !== "queued" && job.status !== "running" && job.jobClass === "task" && job.write && options.showReviewHint) {
+  if (job.status !== "queued" && job.status !== "running" && job.jobClass === "task" && options.showReviewHint) {
     lines.push("  Review changes: /sgl:review --wait");
     lines.push("  Stricter review: /sgl:adversarial-review --wait");
   }
