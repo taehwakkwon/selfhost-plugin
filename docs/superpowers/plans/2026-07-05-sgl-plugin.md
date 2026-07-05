@@ -1639,7 +1639,8 @@ export async function startOpencodeServer(sglConfig, permissionProfile) {
   const port = await findFreePort();
   const child = spawn("opencode", ["serve", "--port", String(port), "--hostname", "127.0.0.1"], {
     env: { ...process.env, OPENCODE_CONFIG: configFile },
-    stdio: ["ignore", "pipe", "pipe"]
+    stdio: ["ignore", "ignore", "pipe"],
+    detached: true
   });
 
   let stderr = "";
@@ -1651,6 +1652,14 @@ export async function startOpencodeServer(sglConfig, permissionProfile) {
     child.once("exit", (code, signal) => resolve({ code, signal }));
   });
 
+  // spawn() emits 'error' instead of 'exit' when the binary itself can't be
+  // launched (e.g. ENOENT). Without a listener, that 'error' event is
+  // unhandled and crashes the whole Node process instead of failing this
+  // one job — so it must feed the same race as exitPromise, not be ignored.
+  const spawnErrorPromise = new Promise((_resolve, reject) => {
+    child.once("error", (error) => reject(error));
+  });
+
   try {
     await Promise.race([
       waitForReady(port, Date.now() + READY_TIMEOUT_MS),
@@ -1658,7 +1667,8 @@ export async function startOpencodeServer(sglConfig, permissionProfile) {
         throw new Error(
           `opencode serve exited before becoming ready (code=${exit.code}, signal=${exit.signal}): ${stderr.trim()}`
         );
-      })
+      }),
+      spawnErrorPromise
     ]);
   } catch (error) {
     terminateProcessTree(child.pid ?? Number.NaN);
