@@ -2214,10 +2214,13 @@ export async function runTrackedJob(job, runner, options = {}) {
       pid: null,
       completedAt
     });
-    appendLogBlock(options.logFile ?? job.logFile ?? null, "Final output", execution.rendered);
+    appendLogBlock(options.logFile ?? job.logFile ?? null, "Final output", execution.rendered, options.secrets ?? []);
     return execution;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = redactSecrets(
+      error instanceof Error ? error.message : String(error),
+      options.secrets ?? []
+    );
     const existing = readStoredJobOrNull(job.workspaceRoot, job.id) ?? runningRecord;
     const completedAt = nowIso();
     writeJobFile(job.workspaceRoot, job.id, {
@@ -4088,6 +4091,7 @@ function createTrackedProgress(job, options = {}) {
   const secrets = [process.env[sglConfig.apiKeyEnv]].filter(Boolean);
   return {
     logFile,
+    secrets,
     progress: createProgressReporter({
       stderr: Boolean(options.stderr),
       logFile,
@@ -4098,8 +4102,8 @@ function createTrackedProgress(job, options = {}) {
 }
 
 async function runForegroundCommand(job, runner, options = {}) {
-  const { logFile, progress } = createTrackedProgress(job, { logFile: options.logFile, stderr: !options.json });
-  const execution = await runTrackedJob(job, () => runner(progress), { logFile });
+  const { logFile, secrets, progress } = createTrackedProgress(job, { logFile: options.logFile, stderr: !options.json });
+  const execution = await runTrackedJob(job, () => runner(progress), { logFile, secrets });
   outputResult(options.json ? execution.payload : execution.rendered, options.json);
   if (execution.exitStatus !== 0) {
     process.exitCode = execution.exitStatus;
@@ -4239,11 +4243,11 @@ async function handleTaskWorker(argv) {
     throw new Error(`Stored job ${options["job-id"]} is missing its task request payload.`);
   }
 
-  const { logFile, progress } = createTrackedProgress(
+  const { logFile, secrets, progress } = createTrackedProgress(
     { ...storedJob, workspaceRoot },
     { logFile: storedJob.logFile ?? null }
   );
-  await runTrackedJob({ ...storedJob, workspaceRoot, logFile }, () => executeTaskRun({ ...request, onProgress: progress }), { logFile });
+  await runTrackedJob({ ...storedJob, workspaceRoot, logFile }, () => executeTaskRun({ ...request, onProgress: progress }), { logFile, secrets });
 }
 
 async function waitForSingleJobSnapshot(cwd, reference, options = {}) {
