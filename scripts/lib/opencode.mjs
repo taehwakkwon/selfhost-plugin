@@ -4,9 +4,11 @@ import net from "node:net";
 import path from "node:path";
 import process from "node:process";
 
-import { createTempDir, writeJsonFile } from "./fs.mjs";
+import { createOpencodeClient } from "@opencode-ai/sdk";
+
+import { createTempDir, readJsonFile, writeJsonFile } from "./fs.mjs";
 import { binaryAvailable, terminateProcessTree } from "./process.mjs";
-import { buildOpencodeConfig } from "./opencode-provider-config.mjs";
+import { buildOpencodeConfig, PROVIDER_ID } from "./opencode-provider-config.mjs";
 
 const READY_TIMEOUT_MS = 15000;
 const READY_POLL_INTERVAL_MS = 200;
@@ -107,4 +109,169 @@ export async function startOpencodeServer(sglConfig, permissionProfile) {
       fs.rmSync(configDir, { recursive: true, force: true });
     }
   };
+}
+
+export function buildSessionTitle(prompt) {
+  const trimmed = String(prompt ?? "").trim().replace(/\s+/g, " ");
+  return trimmed.length > 80 ? `${trimmed.slice(0, 77)}...` : trimmed || "sgl session";
+}
+
+export function extractFinalText(promptResult) {
+  const parts = Array.isArray(promptResult?.parts) ? promptResult.parts : [];
+  return parts
+    .filter((part) => part.type === "text")
+    .map((part) => part.text ?? "")
+    .join("\n")
+    .trim();
+}
+
+function summarizeEventProperties(properties) {
+  try {
+    return JSON.stringify(properties ?? {}).slice(0, 200);
+  } catch {
+    return "";
+  }
+}
+
+function emitProgress(onProgress, message, phase, extra = {}) {
+  onProgress?.({ message, phase, ...extra });
+}
+
+function streamProgress(client, onProgress) {
+  let stopped = false;
+  const done = (async () => {
+    try {
+      const events = await client.event.subscribe();
+      for await (const event of events.stream) {
+        if (stopped) {
+          break;
+        }
+        emitProgress(onProgress, `${event.type}: ${summarizeEventProperties(event.properties)}`, null);
+      }
+    } catch {
+      // Progress streaming is best-effort; the awaited session.prompt() result is authoritative.
+    }
+  })();
+
+  return {
+    stop() {
+      stopped = true;
+    },
+    done
+  };
+}
+
+export async function runOpencodeTurn(cwd, options) {
+  const { sglConfig, permissionProfile, modelId, prompt, sessionId, onProgress } = options;
+
+  if (!prompt || !prompt.trim()) {
+    throw new Error("A prompt is required for this sgl run.");
+  }
+
+  emitProgress(onProgress, "Starting opencode server.", "starting");
+  const server = await startOpencodeServer(sglConfig, permissionProfile);
+  emitProgress(onProgress, `opencode server ready on port ${server.port}.`, "starting", {
+    serverBaseUrl: server.baseUrl
+  });
+
+  const client = createOpencodeClient({ baseUrl: server.baseUrl });
+
+  try {
+    let session;
+    if (sessionId) {
+      emitProgress(onProgress, `Resuming session ${sessionId}.`, "starting", { threadId: sessionId });
+      session = { id: sessionId };
+    } else {
+      session = await client.session.create({ body: { title: buildSessionTitle(prompt) } });
+      emitProgress(onProgress, `Session ready (${session.id}).`, "starting", { threadId: session.id });
+    }
+
+    const progressSubscription = streamProgress(client, onProgress);
+
+    let result = null;
+    let failure = null;
+    try {
+      result = await client.session.prompt({
+        path: { id: session.id },
+        body: {
+          model: { providerID: PROVIDER_ID, modelID: modelId },
+          parts: [{ type: "text", text: prompt }]
+        }
+      });
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
+    } finally {
+      progressSubscription.stop();
+    }
+
+    if (failure) {
+      emitProgress(onProgress, `opencode error: ${failure}`, "failed");
+      return {
+        status: 1,
+        threadId: session.id,
+        turnId: null,
+        finalMessage: "",
+        error: { message: failure },
+        stderr: server.getStderr()
+      };
+    }
+
+    const finalMessage = extractFinalText(result);
+    emitProgress(onProgress, "Turn completed.", "finalizing");
+
+    return {
+      status: 0,
+      threadId: session.id,
+      turnId: result.info?.id ?? null,
+      finalMessage,
+      error: null,
+      stderr: server.getStderr()
+    };
+  } finally {
+    await server.stop();
+  }
+}
+
+export async function abortOpencodeSession(baseUrl, sessionId) {
+  if (!baseUrl || !sessionId) {
+    return { attempted: false, interrupted: false, detail: "missing baseUrl or sessionId" };
+  }
+  try {
+    const client = createOpencodeClient({ baseUrl });
+    const interrupted = await client.session.abort({ path: { id: sessionId } });
+    return { attempted: true, interrupted: Boolean(interrupted), detail: null };
+  } catch (error) {
+    return { attempted: true, interrupted: false, detail: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export function parseStructuredOutput(rawOutput, fallback = {}) {
+  if (!rawOutput) {
+    return {
+      parsed: null,
+      parseError: fallback.failureMessage ?? "sgl did not return a final structured message.",
+      rawOutput: rawOutput ?? "",
+      ...fallback
+    };
+  }
+
+  try {
+    return {
+      parsed: JSON.parse(rawOutput),
+      parseError: null,
+      rawOutput,
+      ...fallback
+    };
+  } catch (error) {
+    return {
+      parsed: null,
+      parseError: error.message,
+      rawOutput,
+      ...fallback
+    };
+  }
+}
+
+export function readOutputSchema(schemaPath) {
+  return readJsonFile(schemaPath);
 }
