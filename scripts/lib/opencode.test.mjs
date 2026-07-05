@@ -45,7 +45,7 @@ test("buildSessionTitle truncates long prompts to 80 characters", () => {
 });
 
 test("buildSessionTitle falls back to a default for empty prompts", () => {
-  assert.equal(buildSessionTitle("   "), "sgl session");
+  assert.equal(buildSessionTitle("   "), "selfhost session");
 });
 
 test("extractFinalText joins text parts and ignores non-text parts", () => {
@@ -72,6 +72,6 @@ test("parseStructuredOutput reports a parse error for invalid JSON without throw
 });
 
 test("parseStructuredOutput reports a fallback message for empty output", () => {
-  const result = parseStructuredOutput("", { failureMessage: "sgl returned nothing" });
-  assert.equal(result.parseError, "sgl returned nothing");
+  const result = parseStructuredOutput("", { failureMessage: "selfhost returned nothing" });
+  assert.equal(result.parseError, "selfhost returned nothing");
 });

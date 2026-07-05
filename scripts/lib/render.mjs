@@ -103,17 +103,17 @@ function formatResumeCommand(job) {
   if (!job?.threadId) {
     return null;
   }
-  return `/sgl:rescue --resume`;
+  return `/selfhost:rescue --resume`;
 }
 
 function appendActiveJobsTable(lines, jobs) {
   lines.push("Active jobs:");
-  lines.push("| Job | Kind | Status | Phase | Elapsed | sgl Session ID | Summary | Actions |");
+  lines.push("| Job | Kind | Status | Phase | Elapsed | selfhost Session ID | Summary | Actions |");
   lines.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const job of jobs) {
-    const actions = [`/sgl:status ${job.id}`];
+    const actions = [`/selfhost:status ${job.id}`];
     if (job.status === "queued" || job.status === "running") {
-      actions.push(`/sgl:cancel ${job.id}`);
+      actions.push(`/selfhost:cancel ${job.id}`);
     }
     lines.push(
       `| ${escapeMarkdownCell(job.id)} | ${escapeMarkdownCell(job.kindLabel)} | ${escapeMarkdownCell(job.status)} | ${escapeMarkdownCell(job.phase ?? "")} | ${escapeMarkdownCell(job.elapsed ?? "")} | ${escapeMarkdownCell(job.threadId ?? "")} | ${escapeMarkdownCell(job.summary ?? "")} | ${actions.map((action) => `\`${action}\``).join("<br>")} |`
@@ -136,7 +136,7 @@ function pushJobDetails(lines, job, options = {}) {
     lines.push(`  Duration: ${job.duration}`);
   }
   if (job.threadId) {
-    lines.push(`  sgl session ID: ${job.threadId}`);
+    lines.push(`  selfhost session ID: ${job.threadId}`);
   }
   const resumeCommand = formatResumeCommand(job);
   if (resumeCommand) {
@@ -146,14 +146,14 @@ function pushJobDetails(lines, job, options = {}) {
     lines.push(`  Log: ${job.logFile}`);
   }
   if ((job.status === "queued" || job.status === "running") && options.showCancelHint) {
-    lines.push(`  Cancel: /sgl:cancel ${job.id}`);
+    lines.push(`  Cancel: /selfhost:cancel ${job.id}`);
   }
   if (job.status !== "queued" && job.status !== "running" && options.showResultHint) {
-    lines.push(`  Result: /sgl:result ${job.id}`);
+    lines.push(`  Result: /selfhost:result ${job.id}`);
   }
   if (job.status !== "queued" && job.status !== "running" && job.jobClass === "task" && options.showReviewHint) {
-    lines.push("  Review changes: /sgl:review --wait");
-    lines.push("  Stricter review: /sgl:adversarial-review --wait");
+    lines.push("  Review changes: /selfhost:review --wait");
+    lines.push("  Stricter review: /selfhost:adversarial-review --wait");
   }
   if (job.progressPreview?.length) {
     lines.push("  Progress:");
@@ -165,7 +165,7 @@ function pushJobDetails(lines, job, options = {}) {
 
 export function renderSetupReport(report) {
   const lines = [
-    "# sgl Setup",
+    "# selfhost Setup",
     "",
     `Status: ${report.ready ? "ready" : "needs attention"}`,
     "",
@@ -200,9 +200,9 @@ export function renderSetupReport(report) {
 export function renderReviewResult(parsedResult, meta) {
   if (!parsedResult.parsed) {
     const lines = [
-      `# sgl ${meta.reviewLabel}`,
+      `# selfhost ${meta.reviewLabel}`,
       "",
-      "sgl did not return valid structured JSON.",
+      "selfhost did not return valid structured JSON.",
       "",
       `- Parse error: ${parsedResult.parseError}`
     ];
@@ -217,10 +217,10 @@ export function renderReviewResult(parsedResult, meta) {
   const validationError = validateReviewResultShape(parsedResult.parsed);
   if (validationError) {
     const lines = [
-      `# sgl ${meta.reviewLabel}`,
+      `# selfhost ${meta.reviewLabel}`,
       "",
       `Target: ${meta.targetLabel}`,
-      "sgl returned JSON with an unexpected review shape.",
+      "selfhost returned JSON with an unexpected review shape.",
       "",
       `- Validation error: ${validationError}`
     ];
@@ -235,7 +235,7 @@ export function renderReviewResult(parsedResult, meta) {
   const data = normalizeReviewResultData(parsedResult.parsed);
   const findings = [...data.findings].sort((left, right) => severityRank(left.severity) - severityRank(right.severity));
   const lines = [
-    `# sgl ${meta.reviewLabel}`,
+    `# selfhost ${meta.reviewLabel}`,
     "",
     `Target: ${meta.targetLabel}`,
     `Verdict: ${data.verdict}`,
@@ -271,14 +271,14 @@ export function renderReviewResult(parsedResult, meta) {
 export function renderPlainReviewResult(result, meta) {
   const finalMessage = String(result.finalMessage ?? "").trim();
   const stderr = String(result.stderr ?? "").trim();
-  const lines = [`# sgl ${meta.reviewLabel}`, "", `Target: ${meta.targetLabel}`, ""];
+  const lines = [`# selfhost ${meta.reviewLabel}`, "", `Target: ${meta.targetLabel}`, ""];
 
   if (finalMessage) {
     lines.push(finalMessage);
   } else if (result.status === 0) {
-    lines.push("sgl review completed without any output.");
+    lines.push("selfhost review completed without any output.");
   } else {
-    lines.push("sgl review failed.");
+    lines.push("selfhost review failed.");
   }
 
   if (stderr) {
@@ -294,13 +294,13 @@ export function renderTaskResult(parsedResult, meta) {
     return rawOutput.endsWith("\n") ? rawOutput : `${rawOutput}\n`;
   }
 
-  const message = String(parsedResult?.failureMessage ?? "").trim() || "sgl did not return a final message.";
+  const message = String(parsedResult?.failureMessage ?? "").trim() || "selfhost did not return a final message.";
   return `${message}\n`;
 }
 
 export function renderStatusReport(report) {
   const lines = [
-    "# sgl Status",
+    "# selfhost Status",
     "",
     `Session runtime: ${report.sessionRuntime.label}`,
     `Review gate: ${report.config.stopReviewGate ? "enabled" : "disabled"}`,
@@ -344,14 +344,14 @@ export function renderStatusReport(report) {
 
   if (report.needsReview) {
     lines.push("The stop-time review gate is enabled.");
-    lines.push("Ending the session will trigger a fresh sgl adversarial review and block if it finds issues.");
+    lines.push("Ending the session will trigger a fresh selfhost adversarial review and block if it finds issues.");
   }
 
   return `${lines.join("\n").trimEnd()}\n`;
 }
 
 export function renderJobStatusReport(job) {
-  const lines = ["# sgl Job Status", ""];
+  const lines = ["# selfhost Job Status", ""];
   pushJobDetails(lines, job, {
     showElapsed: job.status === "queued" || job.status === "running",
     showDuration: job.status !== "queued" && job.status !== "running",
@@ -365,13 +365,13 @@ export function renderJobStatusReport(job) {
 
 export function renderStoredJobResult(job, storedJob) {
   const threadId = storedJob?.threadId ?? job.threadId ?? null;
-  const resumeCommand = threadId ? "/sgl:rescue --resume" : null;
+  const resumeCommand = threadId ? "/selfhost:rescue --resume" : null;
   if (isStructuredReviewStoredResult(storedJob) && storedJob?.rendered) {
     const output = storedJob.rendered.endsWith("\n") ? storedJob.rendered : `${storedJob.rendered}\n`;
     if (!threadId) {
       return output;
     }
-    return `${output}\nsgl session ID: ${threadId}\nResume: ${resumeCommand}\n`;
+    return `${output}\nselfhost session ID: ${threadId}\nResume: ${resumeCommand}\n`;
   }
 
   const rawOutput =
@@ -383,7 +383,7 @@ export function renderStoredJobResult(job, storedJob) {
     if (!threadId) {
       return output;
     }
-    return `${output}\nsgl session ID: ${threadId}\nResume: ${resumeCommand}\n`;
+    return `${output}\nselfhost session ID: ${threadId}\nResume: ${resumeCommand}\n`;
   }
 
   if (storedJob?.rendered) {
@@ -391,18 +391,18 @@ export function renderStoredJobResult(job, storedJob) {
     if (!threadId) {
       return output;
     }
-    return `${output}\nsgl session ID: ${threadId}\nResume: ${resumeCommand}\n`;
+    return `${output}\nselfhost session ID: ${threadId}\nResume: ${resumeCommand}\n`;
   }
 
   const lines = [
-    `# ${job.title ?? "sgl Result"}`,
+    `# ${job.title ?? "selfhost Result"}`,
     "",
     `Job: ${job.id}`,
     `Status: ${job.status}`
   ];
 
   if (threadId) {
-    lines.push(`sgl session ID: ${threadId}`);
+    lines.push(`selfhost session ID: ${threadId}`);
     lines.push(`Resume: ${resumeCommand}`);
   }
 
@@ -423,7 +423,7 @@ export function renderStoredJobResult(job, storedJob) {
 
 export function renderCancelReport(job) {
   const lines = [
-    "# sgl Cancel",
+    "# selfhost Cancel",
     "",
     `Cancelled ${job.id}.`,
     ""
@@ -435,7 +435,7 @@ export function renderCancelReport(job) {
   if (job.summary) {
     lines.push(`- Summary: ${job.summary}`);
   }
-  lines.push("- Check `/sgl:status` for the updated queue.");
+  lines.push("- Check `/selfhost:status` for the updated queue.");
 
   return `${lines.join("\n").trimEnd()}\n`;
 }

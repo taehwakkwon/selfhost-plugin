@@ -49,7 +49,7 @@ function buildSetupNote(cwd) {
   }
 
   const detail = availability.detail ? ` ${availability.detail}.` : "";
-  return `opencode is not set up for the review gate.${detail} Run /sgl:setup.`;
+  return `opencode is not set up for the review gate.${detail} Run /selfhost:setup.`;
 }
 
 function parseStopReviewOutput(rawOutput) {
@@ -57,7 +57,7 @@ function parseStopReviewOutput(rawOutput) {
   if (!text) {
     return {
       ok: false,
-      reason: "The stop-time sgl review task returned no final output. Run /sgl:review --wait manually or bypass the gate."
+      reason: "The stop-time selfhost review task returned no final output. Run /selfhost:review --wait manually or bypass the gate."
     };
   }
 
@@ -69,18 +69,18 @@ function parseStopReviewOutput(rawOutput) {
     const reason = firstLine.slice("BLOCK:".length).trim() || text;
     return {
       ok: false,
-      reason: `sgl stop-time review found issues that still need fixes before ending the session: ${reason}`
+      reason: `selfhost stop-time review found issues that still need fixes before ending the session: ${reason}`
     };
   }
 
   return {
     ok: false,
-    reason: "The stop-time sgl review task returned an unexpected answer. Run /sgl:review --wait manually or bypass the gate."
+    reason: "The stop-time selfhost review task returned an unexpected answer. Run /selfhost:review --wait manually or bypass the gate."
   };
 }
 
 function runStopReview(cwd, input = {}) {
-  const scriptPath = path.join(SCRIPT_DIR, "sgl-companion.mjs");
+  const scriptPath = path.join(SCRIPT_DIR, "selfhost-companion.mjs");
   const lastAssistantMessage = String(input.last_assistant_message ?? "").trim();
   const childEnv = {
     ...process.env,
@@ -95,7 +95,7 @@ function runStopReview(cwd, input = {}) {
   if (result.error?.code === "ETIMEDOUT") {
     return {
       ok: false,
-      reason: "The stop-time sgl review task timed out after 15 minutes. Run /sgl:review --wait manually or bypass the gate."
+      reason: "The stop-time selfhost review task timed out after 15 minutes. Run /selfhost:review --wait manually or bypass the gate."
     };
   }
 
@@ -104,8 +104,8 @@ function runStopReview(cwd, input = {}) {
     return {
       ok: false,
       reason: detail
-        ? `The stop-time sgl review task failed: ${detail}`
-        : "The stop-time sgl review task failed. Run /sgl:review --wait manually or bypass the gate."
+        ? `The stop-time selfhost review task failed: ${detail}`
+        : "The stop-time selfhost review task failed. Run /selfhost:review --wait manually or bypass the gate."
     };
   }
 
@@ -115,7 +115,7 @@ function runStopReview(cwd, input = {}) {
   } catch {
     return {
       ok: false,
-      reason: "The stop-time sgl review task returned invalid JSON. Run /sgl:review --wait manually or bypass the gate."
+      reason: "The stop-time selfhost review task returned invalid JSON. Run /selfhost:review --wait manually or bypass the gate."
     };
   }
 }
@@ -129,7 +129,7 @@ function main() {
   const jobs = sortJobsNewestFirst(filterJobsForCurrentSession(listJobs(workspaceRoot), input));
   const runningJob = jobs.find((job) => job.status === "queued" || job.status === "running");
   const runningTaskNote = runningJob
-    ? `sgl job ${runningJob.id} is still running. Check /sgl:status and use /sgl:cancel ${runningJob.id} if you want to stop it before ending the session.`
+    ? `selfhost job ${runningJob.id} is still running. Check /selfhost:status and use /selfhost:cancel ${runningJob.id} if you want to stop it before ending the session.`
     : null;
 
   if (!config.stopReviewGate) {

@@ -1,11 +1,11 @@
 ---
-description: Run an sgl code review against local git state
+description: Run an selfhost code review against local git state
 argument-hint: '[--wait|--background] [--base <ref>] [--scope auto|working-tree|branch]'
 disable-model-invocation: true
 allowed-tools: Read, Glob, Grep, Bash(node:*), Bash(git:*), AskUserQuestion
 ---
 
-Run an sgl review through the shared plugin runtime.
+Run an selfhost review through the shared plugin runtime.
 
 Raw slash-command arguments:
 `$ARGUMENTS`
@@ -13,7 +13,7 @@ Raw slash-command arguments:
 Core constraint:
 - This command is review-only.
 - Do not fix issues, apply patches, or suggest that you are about to make changes.
-- Your only job is to run the review and return sgl's output verbatim to the user.
+- Your only job is to run the review and return selfhost's output verbatim to the user.
 
 Execution mode rules:
 - If the raw arguments include `--wait`, do not ask. Run the review in the foreground.
@@ -36,13 +36,13 @@ Argument handling:
 - Do not strip `--wait` or `--background` yourself.
 - Do not add extra review instructions or rewrite the user's intent.
 - The companion script parses `--wait` and `--background`, but Claude Code's `Bash(..., run_in_background: true)` is what actually detaches the run.
-- `/sgl:review` does not support extra focus text.
-- If the user needs custom review instructions or more adversarial framing, they should use `/sgl:adversarial-review`.
+- `/selfhost:review` does not support extra focus text.
+- If the user needs custom review instructions or more adversarial framing, they should use `/selfhost:adversarial-review`.
 
 Foreground flow:
 - Run:
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/sgl-companion.mjs" review "$ARGUMENTS"
+node "${CLAUDE_PLUGIN_ROOT}/scripts/selfhost-companion.mjs" review "$ARGUMENTS"
 ```
 - Return the command stdout verbatim, exactly as-is.
 - Do not paraphrase, summarize, or add commentary before or after it.
@@ -52,10 +52,10 @@ Background flow:
 - Launch the review with `Bash` in the background:
 ```typescript
 Bash({
-  command: `node "${CLAUDE_PLUGIN_ROOT}/scripts/sgl-companion.mjs" review "$ARGUMENTS"`,
-  description: "sgl review",
+  command: `node "${CLAUDE_PLUGIN_ROOT}/scripts/selfhost-companion.mjs" review "$ARGUMENTS"`,
+  description: "selfhost review",
   run_in_background: true
 })
 ```
 - Do not call `BashOutput` or wait for completion in this turn.
-- After launching the command, tell the user: "sgl review started in the background. Check `/sgl:status` for progress."
+- After launching the command, tell the user: "selfhost review started in the background. Check `/selfhost:status` for progress."

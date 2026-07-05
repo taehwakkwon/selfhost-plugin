@@ -1,5 +1,5 @@
 {
-  "name": "sgl-plugin",
+  "name": "selfhost-plugin",
   "version": "0.1.0",
   "private": true,
   "type": "module",

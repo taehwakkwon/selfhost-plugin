@@ -3,7 +3,7 @@ import process from "node:process";
 
 import { readJobFile, resolveJobFile, resolveJobLogFile, upsertJob, writeJobFile } from "./state.mjs";
 
-export const SESSION_ID_ENV = "SGL_COMPANION_SESSION_ID";
+export const SESSION_ID_ENV = "SELFHOST_COMPANION_SESSION_ID";
 
 export function nowIso() {
   return new Date().toISOString();
@@ -166,7 +166,7 @@ export function createProgressReporter({ stderr = false, logFile = null, onEvent
     const event = normalizeProgressEvent(eventOrMessage);
     const stderrMessage = redactSecrets(event.stderrMessage ?? event.message, secrets);
     if (stderr && stderrMessage) {
-      process.stderr.write(`[sgl] ${stderrMessage}\n`);
+      process.stderr.write(`[selfhost] ${stderrMessage}\n`);
     }
     appendLogLine(logFile, event.message, secrets);
     appendLogBlock(logFile, event.logTitle, event.logBody, secrets);
@@ -255,7 +255,7 @@ export async function runTrackedJob(job, runner, options = {}) {
       completedAt
     });
     // Rethrow the redacted message, not the original `error` — the caller
-    // (and sgl-companion.mjs's top-level main().catch, which prints
+    // (and selfhost-companion.mjs's top-level main().catch, which prints
     // error.message to stderr unredacted) would otherwise leak whatever
     // this function just redacted for disk. A server-start failure that
     // echoes a secret into its own stderr (opencode.mjs's "opencode serve

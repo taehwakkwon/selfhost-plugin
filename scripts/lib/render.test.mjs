@@ -24,7 +24,7 @@ test("renderReviewResult renders a valid structured review with sorted findings"
     },
     { reviewLabel: "Adversarial Review", targetLabel: "working tree diff" }
   );
-  assert.match(output, /# sgl Adversarial Review/);
+  assert.match(output, /# selfhost Adversarial Review/);
   const criticalIndex = output.indexOf("Data loss");
   const lowIndex = output.indexOf("Nit");
   assert.ok(criticalIndex < lowIndex, "critical finding should be listed before low finding");
@@ -44,21 +44,21 @@ test("renderPlainReviewResult renders finalMessage as the review body", () => {
     { finalMessage: "Looks safe to ship.", stderr: "", status: 0 },
     { reviewLabel: "Review", targetLabel: "branch diff against main" }
   );
-  assert.match(output, /# sgl Review/);
+  assert.match(output, /# selfhost Review/);
   assert.match(output, /Looks safe to ship\./);
 });
 
-test("renderStoredJobResult points the resume hint at /sgl:rescue --resume", () => {
+test("renderStoredJobResult points the resume hint at /selfhost:rescue --resume", () => {
   const output = renderStoredJobResult(
     { id: "task-1", status: "completed", threadId: "session-abc" },
     { threadId: "session-abc", rendered: "All done." }
   );
-  assert.match(output, /sgl session ID: session-abc/);
-  assert.match(output, /Resume: \/sgl:rescue --resume/);
+  assert.match(output, /selfhost session ID: session-abc/);
+  assert.match(output, /Resume: \/selfhost:rescue --resume/);
 });
 
-test("renderCancelReport points at /sgl:status", () => {
+test("renderCancelReport points at /selfhost:status", () => {
   const output = renderCancelReport({ id: "task-2", title: "Test job" });
-  assert.match(output, /# sgl Cancel/);
-  assert.match(output, /\/sgl:status/);
+  assert.match(output, /# selfhost Cancel/);
+  assert.match(output, /\/selfhost:status/);
 });
