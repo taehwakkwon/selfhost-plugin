@@ -1,0 +1,16 @@
+{
+  "name": "selfhost",
+  "owner": { "name": "taehwak" },
+  "metadata": {
+    "description": "Use a self-hosted GLM/DeepSeek gateway from Claude Code to review code or delegate tasks.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "selfhost",
+      "source": "./",
+      "description": "Use a self-hosted GLM/DeepSeek gateway from Claude Code to review code or delegate tasks.",
+      "category": "workflow"
+    }
+  ]
+}
