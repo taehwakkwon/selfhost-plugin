@@ -1,6 +1,6 @@
 {
   "name": "selfhost",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Use a self-hosted GLM/DeepSeek gateway from Claude Code to review code or delegate tasks.",
   "author": {
     "name": "taehwak"
