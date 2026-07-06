@@ -12,6 +12,7 @@ import { buildOpencodeConfig, PROVIDER_ID } from "./opencode-provider-config.mjs
 
 const READY_TIMEOUT_MS = 15000;
 const READY_POLL_INTERVAL_MS = 200;
+const READY_ATTEMPT_TIMEOUT_MS = 5000;
 
 export function getOpencodeAvailability(cwd) {
   return binaryAvailable("opencode", ["--version"], { cwd });
@@ -41,12 +42,24 @@ export function findFreePort() {
 async function waitForReady(port, deadline) {
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`http://127.0.0.1:${port}/doc`);
+      // Without its own timeout, a single slow/stuck attempt can block past
+      // the overall deadline for minutes (observed under load) before the
+      // while-condition ever gets re-checked, turning a 15s budget into an
+      // effectively unbounded hang.
+      const response = await fetch(`http://127.0.0.1:${port}/doc`, {
+        signal: AbortSignal.timeout(READY_ATTEMPT_TIMEOUT_MS)
+      });
+      // An unconsumed body leaves the keep-alive socket marked busy in
+      // undici's connection pool, which then stalls every later request to
+      // this same origin (session.create(), the SSE subscribe, ...)
+      // indefinitely. Always drain it before deciding whether to return.
+      await response.body?.cancel();
       if (response.ok) {
         return;
       }
     } catch {
-      // Server not accepting connections yet; keep polling until the deadline.
+      // Server not accepting connections yet, or this attempt timed out;
+      // keep polling until the deadline.
     }
     await new Promise((resolve) => setTimeout(resolve, READY_POLL_INTERVAL_MS));
   }
@@ -139,9 +152,14 @@ function emitProgress(onProgress, message, phase, extra = {}) {
 
 function streamProgress(client, onProgress) {
   let stopped = false;
+  // The SSE helper auto-reconnects on a dropped connection and only checks
+  // this signal between attempts. Without it, killing the opencode server
+  // just makes every reconnect attempt fail, and it retries forever with
+  // growing backoff instead of ever giving up.
+  const abortController = new AbortController();
   const done = (async () => {
     try {
-      const events = await client.event.subscribe();
+      const events = await client.event.subscribe({ signal: abortController.signal });
       for await (const event of events.stream) {
         if (stopped) {
           break;
@@ -156,6 +174,7 @@ function streamProgress(client, onProgress) {
   return {
     stop() {
       stopped = true;
+      abortController.abort();
     },
     done
   };
