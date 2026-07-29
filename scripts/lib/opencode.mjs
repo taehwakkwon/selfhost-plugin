@@ -193,7 +193,17 @@ export async function runOpencodeTurn(cwd, options) {
     serverBaseUrl: server.baseUrl
   });
 
-  const client = createOpencodeClient({ baseUrl: server.baseUrl });
+  // The SDK defaults to responseStyle "fields", which wraps every payload as
+  // { data, request, response }. Reading session.id / result.parts off that
+  // envelope yields undefined, and because a failed call resolves to
+  // { error, ... } instead of throwing, the turn silently "succeeded" with an
+  // empty message. "data" unwraps the payload; throwOnError makes failures
+  // reach the catch below instead of being reported as an empty result.
+  const client = createOpencodeClient({
+    baseUrl: server.baseUrl,
+    responseStyle: "data",
+    throwOnError: true
+  });
   let progressSubscription = null;
 
   try {
@@ -262,7 +272,13 @@ export async function abortOpencodeSession(baseUrl, sessionId) {
     return { attempted: false, interrupted: false, detail: "missing baseUrl or sessionId" };
   }
   try {
-    const client = createOpencodeClient({ baseUrl });
+    // Same envelope problem as runOpencodeTurn: without responseStyle "data"
+    // this resolves to an always-truthy { data, request, response } object, so
+    // Boolean(interrupted) could never be false. Unwrapping makes the flag
+    // reflect the body. Note that opencode 1.17.13 answers every abort with
+    // 200 true, even for a session id that does not exist, so this only starts
+    // reporting real outcomes once the server distinguishes them.
+    const client = createOpencodeClient({ baseUrl, responseStyle: "data", throwOnError: true });
     const interrupted = await client.session.abort({ path: { id: sessionId } });
     return { attempted: true, interrupted: Boolean(interrupted), detail: null };
   } catch (error) {
