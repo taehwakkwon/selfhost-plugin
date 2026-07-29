@@ -1,5 +1,5 @@
 ---
-description: "[--background|--wait] [--resume|--fresh] [--model <glm|dsv4>] [what selfhost should investigate, solve, or continue]"
+description: "[--background|--wait] [--resume|--fresh] [--model <glm|kimi>] [what selfhost should investigate, solve, or continue]"
 allowed-tools: Bash(node:*), AskUserQuestion, Agent
 ---
 
@@ -40,7 +40,8 @@ Operating rules:
 - Return the selfhost companion stdout verbatim to the user.
 - Do not paraphrase, summarize, rewrite, or add commentary before or after it.
 - Do not ask the subagent to inspect files, monitor progress, poll `/selfhost:status`, fetch `/selfhost:result`, call `/selfhost:cancel`, summarize output, or do follow-up work of its own.
-- Leave the model unset unless the user explicitly asks for one. If they ask for `glm` or `dsv4`, pass that through with `--model`.
+- Leave the model unset unless the user explicitly asks for one. If they ask for `glm` or `kimi`, pass that through with `--model`.
+- `kimi` (kimi-k3) is a reasoning model and is substantially slower than `glm`. When the user asks for `kimi` and has not chosen an execution mode, prefer background.
 - Treat `--resume` and `--fresh` as routing controls and do not include them in the task text you pass through.
 - `--resume` means add `--resume-last`.
 - `--fresh` means do not add `--resume-last`.

@@ -39,7 +39,7 @@ test("resolveModelId resolves known aliases and passes through unknown ids", asy
     const { loadSelfhostConfig, resolveModelId } = await import(`./config.mjs?t=${Date.now()}-3`);
     const config = loadSelfhostConfig();
     assert.equal(resolveModelId(config, "glm"), "GLM-5.2-FP8");
-    assert.equal(resolveModelId(config, "dsv4"), "deepseek-ai/DeepSeek-V4-Flash");
+    assert.equal(resolveModelId(config, "kimi"), "kimi-k3");
     assert.equal(resolveModelId(config, undefined), "GLM-5.2-FP8");
     assert.equal(resolveModelId(config, "some-other-model-id"), "some-other-model-id");
   });
