@@ -14,11 +14,11 @@ test("parseArgs splits booleans, values, and positionals", () => {
 });
 
 test("parseArgs applies alias map to short flags", () => {
-  const { options } = parseArgs(["-m", "dsv4"], {
+  const { options } = parseArgs(["-m", "kimi"], {
     valueOptions: ["model"],
     aliasMap: { m: "model" }
   });
-  assert.equal(options.model, "dsv4");
+  assert.equal(options.model, "kimi");
 });
 
 test("splitRawArgumentString respects quotes", () => {

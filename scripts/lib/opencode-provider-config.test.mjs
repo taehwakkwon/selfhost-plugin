@@ -8,7 +8,7 @@ const SAMPLE_CONFIG = {
   apiKeyEnv: "CLIENT_KEY",
   models: {
     glm: "GLM-5.2-FP8",
-    dsv4: "deepseek-ai/DeepSeek-V4-Flash"
+    kimi: "kimi-k3"
   }
 };
 
@@ -18,7 +18,7 @@ test("buildOpencodeConfig registers the gateway as an openai-compatible provider
   assert.equal(provider.npm, "@ai-sdk/openai-compatible");
   assert.equal(provider.options.baseURL, "https://gateway.example.com/v1");
   assert.equal(provider.options.apiKey, "{env:CLIENT_KEY}");
-  assert.deepEqual(Object.keys(provider.models).sort(), ["GLM-5.2-FP8", "deepseek-ai/DeepSeek-V4-Flash"].sort());
+  assert.deepEqual(Object.keys(provider.models).sort(), ["GLM-5.2-FP8", "kimi-k3"].sort());
 });
 
 test("rescue profile allows edit and bash", () => {

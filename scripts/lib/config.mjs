@@ -13,7 +13,7 @@ export const DEFAULT_SELFHOST_CONFIG = {
   defaultModelAlias: "glm",
   models: {
     glm: "GLM-5.2-FP8",
-    dsv4: "deepseek-ai/DeepSeek-V4-Flash"
+    kimi: "kimi-k3"
   },
   structuredOutputSupported: null
 };

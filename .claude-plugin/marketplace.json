@@ -2,14 +2,14 @@
   "name": "selfhost",
   "owner": { "name": "taehwak" },
   "metadata": {
-    "description": "Use a self-hosted GLM/DeepSeek gateway from Claude Code to review code or delegate tasks.",
-    "version": "0.1.1"
+    "description": "Use a self-hosted GLM/Kimi gateway from Claude Code to review code or delegate tasks.",
+    "version": "0.2.0"
   },
   "plugins": [
     {
       "name": "selfhost",
       "source": "./",
-      "description": "Use a self-hosted GLM/DeepSeek gateway from Claude Code to review code or delegate tasks.",
+      "description": "Use a self-hosted GLM/Kimi gateway from Claude Code to review code or delegate tasks.",
       "category": "workflow"
     }
   ]

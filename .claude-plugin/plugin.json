@@ -1,7 +1,7 @@
 {
   "name": "selfhost",
-  "version": "0.1.1",
-  "description": "Use a self-hosted GLM/DeepSeek gateway from Claude Code to review code or delegate tasks.",
+  "version": "0.2.0",
+  "description": "Use a self-hosted GLM/Kimi gateway from Claude Code to review code or delegate tasks.",
   "author": {
     "name": "taehwak"
   }
