@@ -26,24 +26,50 @@ export function resolveConfigFile() {
   return path.join(resolveConfigDir(), "config.json");
 }
 
+function defaultConfig() {
+  return { ...DEFAULT_SELFHOST_CONFIG, models: { ...DEFAULT_SELFHOST_CONFIG.models } };
+}
+
+// The raw config.json contents, or {} when there is no readable file. Callers
+// that persist need this rather than the merged view, so that defaults the user
+// never chose don't get frozen into their file.
+function readOnDiskConfig() {
+  const configFile = resolveConfigFile();
+  if (!fs.existsSync(configFile)) {
+    return {};
+  }
+  try {
+    const parsed = readJsonFile(configFile);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 export function loadSelfhostConfig() {
   const configFile = resolveConfigFile();
   if (!fs.existsSync(configFile)) {
-    return { ...DEFAULT_SELFHOST_CONFIG, models: { ...DEFAULT_SELFHOST_CONFIG.models } };
+    return defaultConfig();
   }
 
   try {
     const parsed = readJsonFile(configFile);
+    // `models` is NOT merged with the defaults. Merging made built-in aliases
+    // impossible to remove: deleting one from config.json just let the default
+    // reappear, so a decommissioned model kept resolving to a dead id. When the
+    // file declares `models` — including an empty object, meaning "no aliases"
+    // — that declaration is the whole truth.
+    const hasOwnModels =
+      Object.prototype.hasOwnProperty.call(parsed, "models") &&
+      parsed.models &&
+      typeof parsed.models === "object";
     return {
       ...DEFAULT_SELFHOST_CONFIG,
       ...parsed,
-      models: {
-        ...DEFAULT_SELFHOST_CONFIG.models,
-        ...(parsed.models ?? {})
-      }
+      models: hasOwnModels ? { ...parsed.models } : { ...DEFAULT_SELFHOST_CONFIG.models }
     };
   } catch {
-    return { ...DEFAULT_SELFHOST_CONFIG, models: { ...DEFAULT_SELFHOST_CONFIG.models } };
+    return defaultConfig();
   }
 }
 
@@ -54,9 +80,28 @@ export function saveSelfhostConfig(config) {
 }
 
 export function updateSelfhostConfig(mutate) {
-  const config = loadSelfhostConfig();
-  mutate(config);
-  return saveSelfhostConfig(config);
+  const onDisk = readOnDiskConfig();
+  const merged = loadSelfhostConfig();
+  const before = JSON.parse(JSON.stringify(merged));
+
+  mutate(merged);
+
+  // Persist a key only when the user already had it on disk or the mutation
+  // actually changed it. Writing the whole merged view instead would stamp
+  // every default into config.json on the first `setup` run, which is how the
+  // hardcoded aliases became unremovable in practice.
+  const next = { ...onDisk };
+  for (const key of Object.keys(merged)) {
+    const changed = JSON.stringify(merged[key]) !== JSON.stringify(before[key]);
+    if (changed || Object.prototype.hasOwnProperty.call(onDisk, key)) {
+      next[key] = merged[key];
+    }
+  }
+  saveSelfhostConfig(next);
+
+  // Callers use the return value as a complete config (baseUrl, apiKeyEnv, ...),
+  // so hand back the merged view, not the trimmed thing written to disk.
+  return merged;
 }
 
 export function resolveModelId(config, aliasOrId) {
