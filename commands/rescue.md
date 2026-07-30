@@ -1,5 +1,5 @@
 ---
-description: "[--background|--wait] [--resume|--fresh] [--model <glm|kimi>] [what selfhost should investigate, solve, or continue]"
+description: "[--background|--wait] [--resume|--fresh] [--model <alias>] [what selfhost should investigate, solve, or continue]"
 allowed-tools: Bash(node:*), AskUserQuestion, Agent
 ---
 
@@ -40,8 +40,8 @@ Operating rules:
 - Return the selfhost companion stdout verbatim to the user.
 - Do not paraphrase, summarize, rewrite, or add commentary before or after it.
 - Do not ask the subagent to inspect files, monitor progress, poll `/selfhost:status`, fetch `/selfhost:result`, call `/selfhost:cancel`, summarize output, or do follow-up work of its own.
-- Leave the model unset unless the user explicitly asks for one. If they ask for `glm` or `kimi`, pass that through with `--model`.
-- `kimi` (kimi-k3) is a reasoning model and is substantially slower than `glm`. When the user asks for `kimi` and has not chosen an execution mode, prefer background.
+- Leave the model unset unless the user explicitly asks for one. If they name a model, pass it through with `--model`. Aliases are whatever the user has configured; `/selfhost:setup` lists them alongside the models the gateway serves.
+- Reasoning models spend a long time before emitting any answer, so they are far slower than a plain chat model. When the user asks for one and has not chosen an execution mode, prefer background.
 - Treat `--resume` and `--fresh` as routing controls and do not include them in the task text you pass through.
 - `--resume` means add `--resume-last`.
 - `--fresh` means do not add `--resume-last`.

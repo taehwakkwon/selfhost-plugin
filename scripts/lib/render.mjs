@@ -173,11 +173,23 @@ export function renderSetupReport(report) {
     `- node: ${report.node.detail}`,
     `- opencode: ${report.opencode.detail}`,
     `- gateway: ${report.gateway.detail}`,
+    `- models: ${report.models.detail}`,
     `- structured output: ${report.structuredOutput.detail}`,
     `- session runtime: ${report.sessionRuntime.label}`,
     `- review gate: ${report.reviewGateEnabled ? "enabled" : "disabled"}`,
     ""
   ];
+
+  if (report.models.discovered.length > 0) {
+    lines.push("Gateway models:");
+    for (const modelId of report.models.discovered) {
+      const aliases = Object.entries(report.models.configured)
+        .filter(([, id]) => id === modelId)
+        .map(([alias]) => alias);
+      lines.push(`- ${modelId}${aliases.length > 0 ? ` (${aliases.join(", ")})` : ""}`);
+    }
+    lines.push("");
+  }
 
   if (report.actionsTaken.length > 0) {
     lines.push("Actions taken:");

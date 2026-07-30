@@ -21,7 +21,9 @@ test("loadSelfhostConfig returns defaults when no config file exists", async () 
     const { loadSelfhostConfig, DEFAULT_SELFHOST_CONFIG } = await import(`./config.mjs?t=${Date.now()}-1`);
     const config = loadSelfhostConfig();
     assert.equal(config.baseUrl, DEFAULT_SELFHOST_CONFIG.baseUrl);
-    assert.equal(config.models.glm, "GLM-5.2-FP8");
+    // No aliases ship with the plugin any more; /selfhost:setup discovers what
+    // the configured gateway actually serves.
+    assert.deepEqual(config.models, {});
   });
 });
 
@@ -35,14 +37,28 @@ test("saveSelfhostConfig then loadSelfhostConfig round-trips an override", async
   });
 });
 
-test("resolveModelId resolves known aliases and passes through unknown ids", async () => {
-  await withTempConfigDir(async () => {
+test("resolveModelId resolves configured aliases and passes through unknown ids", async () => {
+  await withTempConfigDir(async (dir) => {
     const { loadSelfhostConfig, resolveModelId } = await import(`./config.mjs?t=${Date.now()}-3`);
+    fs.writeFileSync(
+      path.join(dir, "config.json"),
+      JSON.stringify({ version: 1, defaultModelAlias: "glm", models: { glm: "GLM-5.2-FP8", kimi: "kimi-k3" } })
+    );
+
     const config = loadSelfhostConfig();
     assert.equal(resolveModelId(config, "glm"), "GLM-5.2-FP8");
     assert.equal(resolveModelId(config, "kimi"), "kimi-k3");
     assert.equal(resolveModelId(config, undefined), "GLM-5.2-FP8");
     assert.equal(resolveModelId(config, "some-other-model-id"), "some-other-model-id");
+  });
+});
+
+test("with no aliases configured, an explicit model id still passes through", async () => {
+  await withTempConfigDir(async () => {
+    const { loadSelfhostConfig, resolveModelId } = await import(`./config.mjs?t=${Date.now()}-3b`);
+    const config = loadSelfhostConfig();
+    assert.deepEqual(config.models, {});
+    assert.equal(resolveModelId(config, "GLM-5.2-FP8"), "GLM-5.2-FP8");
   });
 });
 
@@ -76,11 +92,11 @@ test("an explicitly empty models map means no aliases at all", async () => {
   });
 });
 
-test("a config file without a models key still gets the default aliases", async () => {
+test("a config file without a models key falls back to the seeded map", async () => {
   await withTempConfigDir(async (dir) => {
-    const { loadSelfhostConfig } = await import(`./config.mjs?t=${Date.now()}-6`);
+    const { loadSelfhostConfig, DEFAULT_SELFHOST_CONFIG } = await import(`./config.mjs?t=${Date.now()}-6`);
     fs.writeFileSync(path.join(dir, "config.json"), JSON.stringify({ version: 1 }));
-    assert.equal(loadSelfhostConfig().models.glm, "GLM-5.2-FP8");
+    assert.deepEqual(loadSelfhostConfig().models, DEFAULT_SELFHOST_CONFIG.models);
   });
 });
 
@@ -133,19 +149,17 @@ test("updateSelfhostConfig returns the full merged config, not the trimmed file"
   });
 });
 
-test("adding an alias persists the whole resulting map, defaults included", async () => {
+test("adding an alias persists it and survives a reload", async () => {
   await withTempConfigDir(async (dir) => {
     const { updateSelfhostConfig, loadSelfhostConfig } = await import(`./config.mjs?t=${Date.now()}-10`);
     updateSelfhostConfig((config) => {
-      config.models.custom = "some-model-id";
+      config.models = { ...config.models, custom: "some-model-id" };
     });
 
     const written = JSON.parse(fs.readFileSync(path.join(dir, "config.json"), "utf8"));
-    assert.equal(written.models.custom, "some-model-id");
-    // Deliberate: once `models` is touched it becomes authoritative, so the
-    // seeded aliases have to be written alongside the new one. Writing only the
-    // delta would silently drop them on the next load.
-    assert.equal(written.models.glm, "GLM-5.2-FP8");
-    assert.deepEqual(loadSelfhostConfig().models, written.models);
+    assert.deepEqual(written.models, { custom: "some-model-id" });
+    // Once `models` is on disk it is authoritative, so what was written is
+    // exactly what comes back — no default gets folded in behind it.
+    assert.deepEqual(loadSelfhostConfig().models, { custom: "some-model-id" });
   });
 });

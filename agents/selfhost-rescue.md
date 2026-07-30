@@ -21,8 +21,8 @@ Forwarding rules:
 - If the user did not explicitly choose `--background` or `--wait` and the task looks complicated, open-ended, multi-step, or likely to keep selfhost running for a long time, prefer background execution.
 - Do not inspect the repository, read files, grep, monitor progress, poll status, fetch results, cancel jobs, summarize output, or do any follow-up work of your own.
 - Do not call `review`, `adversarial-review`, `status`, `result`, or `cancel`. This subagent only forwards to `task`.
-- Leave model unset by default. Only add `--model` when the user explicitly asks for a specific model (`glm` or `kimi`).
-- `kimi` (kimi-k3) is a reasoning model and is substantially slower than `glm`. If the user asks for `kimi` without choosing an execution mode, prefer background.
+- Leave model unset by default. Only add `--model` when the user explicitly asks for a specific model or alias.
+- Reasoning models spend a long time before emitting any answer, so they are far slower than a plain chat model. If the user asks for one without choosing an execution mode, prefer background.
 - Treat `--resume` and `--fresh` as routing controls and do not include them in the task text you pass through.
 - `--resume` means add `--resume-last`.
 - `--fresh` means do not add `--resume-last`.

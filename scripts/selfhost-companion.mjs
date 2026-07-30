@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { parseArgs, splitRawArgumentString } from "./lib/args.mjs";
 import { loadSelfhostConfig, updateSelfhostConfig, resolveModelId } from "./lib/config.mjs";
+import { discoverGatewayModels, findUnknownAliases } from "./lib/model-discovery.mjs";
 import {
   getOpencodeAvailability,
   getSessionRuntimeStatus,
@@ -209,12 +210,41 @@ async function buildSetupReport(cwd, actionsTaken = []) {
   let selfhostConfig = loadSelfhostConfig();
   const gateway = await probeGatewayReachability(selfhostConfig);
 
+  const discovery = await discoverGatewayModels(selfhostConfig);
+  const unknownAliases = discovery.available
+    ? findUnknownAliases(selfhostConfig.models, discovery.models)
+    : [];
+  const models = {
+    available: discovery.available,
+    detail: discovery.detail,
+    discovered: discovery.models,
+    configured: { ...selfhostConfig.models },
+    unknownAliases
+  };
+
   const nextSteps = [];
   if (!opencodeStatus.available) {
     nextSteps.push("Install opencode (see https://opencode.ai) so /selfhost:rescue and /selfhost:review have an execution engine.");
   }
-  if (!gateway.available) {
+  if (discovery.reason === "placeholder") {
+    // Reported before gateway connectivity: "no gateway configured" is the
+    // cause, and "gateway unreachable" is just its symptom.
+    nextSteps.push("Point the plugin at your gateway: /selfhost:setup --base-url <url>");
+  } else if (!gateway.available) {
     nextSteps.push(`Fix gateway connectivity: ${gateway.detail}`);
+  }
+  if (discovery.reason !== "placeholder" && !discovery.available) {
+    nextSteps.push(`Could not list gateway models: ${discovery.detail}`);
+  }
+  if (discovery.available && Object.keys(selfhostConfig.models).length === 0) {
+    nextSteps.push(
+      `No model aliases configured. Register one with /selfhost:setup --model <alias>=<model-id> (available: ${discovery.models.join(", ")}).`
+    );
+  }
+  for (const { alias, modelId } of unknownAliases) {
+    nextSteps.push(
+      `Alias "${alias}" points at "${modelId}", which the gateway did not list. Re-point it with /selfhost:setup --model ${alias}=<model-id>.`
+    );
   }
 
   let structuredOutput = { available: selfhostConfig.structuredOutputSupported, detail: "not probed" };
@@ -242,6 +272,7 @@ async function buildSetupReport(cwd, actionsTaken = []) {
     node: nodeStatus,
     opencode: opencodeStatus,
     gateway,
+    models,
     structuredOutput,
     sessionRuntime: getSessionRuntimeStatus(),
     reviewGateEnabled: Boolean(config.stopReviewGate),

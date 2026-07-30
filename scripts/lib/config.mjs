@@ -11,10 +11,12 @@ export const DEFAULT_SELFHOST_CONFIG = {
   baseUrl: "https://gateway.example.com/v1",
   apiKeyEnv: "CLIENT_KEY",
   defaultModelAlias: "glm",
-  models: {
-    glm: "GLM-5.2-FP8",
-    kimi: "kimi-k3"
-  },
+  // Intentionally empty. Hardcoding aliases here paired them to a gateway this
+  // plugin cannot know, and every decommissioned model then needed a release to
+  // remove (see the dsv4 alias). `/selfhost:setup` discovers what the
+  // configured gateway actually serves; until then resolveModelId's unknown-id
+  // passthrough means `--model <real-id>` still works with no aliases at all.
+  models: {},
   structuredOutputSupported: null
 };
 
