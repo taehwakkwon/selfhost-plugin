@@ -148,7 +148,7 @@ function firstMeaningfulLine(text, fallback) {
 async function probeGatewayReachability(selfhostConfig) {
   const token = process.env[selfhostConfig.apiKeyEnv];
   if (!token) {
-    return { available: false, detail: `Environment variable ${selfhostConfig.apiKeyEnv} is not set.` };
+    return { available: false, reason: "no-token", detail: `Environment variable ${selfhostConfig.apiKeyEnv} is not set.` };
   }
   const defaultModelId = resolveModelId(selfhostConfig, undefined);
   try {
@@ -159,11 +159,19 @@ async function probeGatewayReachability(selfhostConfig) {
       signal: AbortSignal.timeout(GATEWAY_PROBE_TIMEOUT_MS)
     });
     if (!response.ok) {
-      return { available: false, detail: `Gateway responded with HTTP ${response.status}.` };
+      return {
+        available: false,
+        reason: "http",
+        detail: `Gateway responded with HTTP ${response.status} for model ${defaultModelId}.`
+      };
     }
-    return { available: true, detail: `Reachable at ${selfhostConfig.baseUrl} (model ${defaultModelId}).` };
+    return { available: true, reason: null, detail: `${defaultModelId} answered a probe.` };
   } catch (error) {
-    return { available: false, detail: error instanceof Error ? error.message : String(error) };
+    const detail = error instanceof Error ? error.message : String(error);
+    // A probe that ran out of time says nothing about whether the model works,
+    // only that it is busy. Anything else is a real error worth repeating.
+    const reason = error?.name === "TimeoutError" || /timeout/i.test(detail) ? "timeout" : "error";
+    return { available: false, reason, detail };
   }
 }
 
@@ -208,9 +216,20 @@ async function buildSetupReport(cwd, actionsTaken = []) {
   const nodeStatus = binaryAvailable("node", ["--version"], { cwd });
   const opencodeStatus = getOpencodeAvailability(cwd);
   let selfhostConfig = loadSelfhostConfig();
-  const gateway = await probeGatewayReachability(selfhostConfig);
 
+  // Liveness is the model listing, not a completion. "Is the gateway up?" and
+  // "does this model answer?" are different questions, and only the first one
+  // decides whether the plugin is usable. Listing models is also cheap, where a
+  // completion can sit in a queue behind other work for longer than any probe
+  // budget and report a healthy gateway as broken.
   const discovery = await discoverGatewayModels(selfhostConfig);
+  const gateway = {
+    available: discovery.available,
+    detail: discovery.available
+      ? `Reachable at ${selfhostConfig.baseUrl}.`
+      : discovery.detail
+  };
+
   const unknownAliases = discovery.available
     ? findUnknownAliases(selfhostConfig.models, discovery.models)
     : [];
@@ -221,6 +240,21 @@ async function buildSetupReport(cwd, actionsTaken = []) {
     configured: { ...selfhostConfig.models },
     unknownAliases
   };
+
+  // Whether the default model is one the gateway serves is a local check
+  // against the discovered list: instant, and definitive in a way a completion
+  // probe is not. This is what gates readiness — a default alias pointing at a
+  // model that no longer exists is exactly the dsv4 failure, and every job
+  // would fail on it.
+  const defaultModelId = resolveModelId(selfhostConfig, undefined);
+  const defaultModelKnown = !discovery.available || discovery.models.includes(defaultModelId);
+
+  // The completion probe stays diagnostic: it answers "does it reply, and how
+  // fast?", which is worth reporting but must not gate readiness, because a
+  // busy model is not a broken install.
+  const defaultModel = gateway.available
+    ? await probeGatewayReachability(selfhostConfig)
+    : { available: false, reason: "not-probed", detail: "not probed (gateway not reachable)" };
 
   const nextSteps = [];
   if (!opencodeStatus.available) {
@@ -246,9 +280,20 @@ async function buildSetupReport(cwd, actionsTaken = []) {
       `Alias "${alias}" points at "${modelId}", which the gateway did not list. Re-point it with /selfhost:setup --model ${alias}=<model-id>.`
     );
   }
+  if (gateway.available && !defaultModelKnown) {
+    nextSteps.push(
+      `The default model "${defaultModelId}" is not one the gateway lists, so every job would fail. Point it at a listed model with /selfhost:setup --model <alias>=<model-id> --default-model <alias>.`
+    );
+  } else if (gateway.available && defaultModel.reason === "timeout") {
+    nextSteps.push(
+      `The gateway is up but ${defaultModelId} did not answer within the probe budget. Jobs should still work, just slowly.`
+    );
+  } else if (gateway.available && !defaultModel.available) {
+    nextSteps.push(`The gateway is up but ${defaultModelId} did not answer: ${defaultModel.detail}`);
+  }
 
   let structuredOutput = { available: selfhostConfig.structuredOutputSupported, detail: "not probed" };
-  if (opencodeStatus.available && gateway.available) {
+  if (opencodeStatus.available && defaultModel.available) {
     const supported = await probeStructuredOutputSupport(selfhostConfig);
     selfhostConfig = updateSelfhostConfig((config) => {
       config.structuredOutputSupported = supported;
@@ -268,11 +313,12 @@ async function buildSetupReport(cwd, actionsTaken = []) {
   const config = getConfig(workspaceRoot);
 
   return {
-    ready: nodeStatus.available && opencodeStatus.available && gateway.available,
+    ready: nodeStatus.available && opencodeStatus.available && gateway.available && defaultModelKnown,
     node: nodeStatus,
     opencode: opencodeStatus,
     gateway,
     models,
+    defaultModel,
     structuredOutput,
     sessionRuntime: getSessionRuntimeStatus(),
     reviewGateEnabled: Boolean(config.stopReviewGate),

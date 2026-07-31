@@ -174,6 +174,7 @@ export function renderSetupReport(report) {
     `- opencode: ${report.opencode.detail}`,
     `- gateway: ${report.gateway.detail}`,
     `- models: ${report.models.detail}`,
+    `- default model: ${report.defaultModel.detail}`,
     `- structured output: ${report.structuredOutput.detail}`,
     `- session runtime: ${report.sessionRuntime.label}`,
     `- review gate: ${report.reviewGateEnabled ? "enabled" : "disabled"}`,
